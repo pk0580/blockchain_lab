@@ -1,0 +1,34 @@
+{
+  "env": {
+    "CLAUDE_APP_ROOT": "src",
+    "CLAUDE_CONTAINER_ROOT": "/var/www/html",
+    "CLAUDE_PHPSTAN_LEVEL": "8",
+    "CLAUDE_PHPSTAN_MEMORY": "512M"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/secret-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/php-postwrite.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

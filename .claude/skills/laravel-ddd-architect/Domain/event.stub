@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\{{BoundedContext}}\Event;
+
+use App\Domain\{{BoundedContext}}\ValueObject\{{Id}};
+use DateTimeImmutable;
+
+/**
+ * Domain event. Past tense. Carries ids only — never full entities.
+ * Dispatched by the Application layer with DB::afterCommit(...).
+ */
+final readonly class {{EventName}}
+{
+    public function __construct(
+        public {{Id}} $aggregateId,
+        public DateTimeImmutable $occurredAt,
+    ) {}
+}

@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Interface\Http\{{BoundedContext}}\Request;
+
+use App\Domain\{{BoundedContext}}\Entity\{{EntityName}};
+use Illuminate\Foundation\Http\FormRequest;
+
+final class {{RequestName}} extends FormRequest
+{
+    public function authorize(): bool
+    {
+        // return $this->user()?->can('create', {{EntityName}}::class) ?? false;
+        return true;
+    }
+
+    /** @return array<string, array<int, string>> */
+    public function rules(): array
+    {
+        return [
+            // 'field' => ['required', 'string', 'max:255'],
+        ];
+    }
+}

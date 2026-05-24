@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\{{BoundedContext}}\Repository;
+
+use App\Domain\{{BoundedContext}}\Entity\{{EntityName}};
+use App\Domain\{{BoundedContext}}\ValueObject\{{Id}};
+
+interface {{RepositoryName}}
+{
+    public function save({{EntityName}} $entity): void;
+
+    public function findById({{Id}} $id): ?{{EntityName}};
+
+    public function nextId(): {{Id}};
+}

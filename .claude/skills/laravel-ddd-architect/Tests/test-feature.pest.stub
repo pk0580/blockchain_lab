@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\User;
+
+uses(Tests\TestCase::class, Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+it('handles the happy path', function () {
+    $response = $this->actingAs(User::factory()->create())
+        ->postJson('/api/v1/{{route}}', [
+            // valid payload
+        ]);
+
+    $response->assertCreated();
+});
+
+it('returns 422 on invalid input', function () {
+    $this->actingAs(User::factory()->create())
+        ->postJson('/api/v1/{{route}}', [])
+        ->assertUnprocessable();
+});
+
+it('rejects unauthenticated requests', function () {
+    $this->postJson('/api/v1/{{route}}', [])->assertUnauthorized();
+});

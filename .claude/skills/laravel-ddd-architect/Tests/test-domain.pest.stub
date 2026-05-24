@@ -1,0 +1,12 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Domain\{{BoundedContext}}\Entity\{{EntityName}};
+use App\Domain\{{BoundedContext}}\ValueObject\{{Id}};
+
+it('creates an entity with the given id', function () {
+    $entity = {{EntityName}}::create(new {{Id}}('00000000-0000-0000-0000-000000000001'));
+
+    expect($entity->id->value)->toBe('00000000-0000-0000-0000-000000000001');
+});

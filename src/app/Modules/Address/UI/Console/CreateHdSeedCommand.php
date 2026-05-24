@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Address\UI\Console;
+
+use App\Modules\Address\Application\UseCase\CreateHdSeed\CreateHdSeedAction;
+use App\Modules\Address\Application\UseCase\CreateHdSeed\CreateHdSeedData;
+use Illuminate\Console\Command;
+
+final class CreateHdSeedCommand extends Command
+{
+    /** @var string */
+    protected $signature = 'address:seed:create
+        {reference : Opaque reference, [a-zA-Z0-9_-]{4,64}}
+        {--family= : bitcoin|evm|tron, or omit for multi-family}
+        {--mnemonic= : Import an existing BIP-39 mnemonic (default: generate)}';
+
+    /** @var string */
+    protected $description = 'Create or import an HD seed in the signing service.';
+
+    public function handle(CreateHdSeedAction $action): int
+    {
+        $id = $action->handle(new CreateHdSeedData(
+            reference: (string) $this->argument('reference'),
+            family: $this->option('family') !== null ? (string) $this->option('family') : null,
+            importMnemonic: $this->option('mnemonic') !== null ? (string) $this->option('mnemonic') : null,
+        ));
+        $this->info("HdSeed created (id={$id->value}).");
+        return self::SUCCESS;
+    }
+}

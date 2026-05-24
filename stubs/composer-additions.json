@@ -1,0 +1,29 @@
+{
+  "_comment": "After `make bootstrap`, merge this autoload block into src/composer.json. Then run `composer dump-autoload`. Adds PSR-4 mapping for App\\Modules\\ → app/Modules/.",
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/",
+      "App\\Modules\\": "app/Modules/",
+      "Database\\Factories\\": "database/factories/",
+      "Database\\Seeders\\": "database/seeders/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "vendor/bin/pest",
+    "stan": "vendor/bin/phpstan analyse --memory-limit=512M",
+    "pint": "vendor/bin/pint",
+    "pint-check": "vendor/bin/pint --test"
+  },
+  "require-dev_additions": {
+    "pestphp/pest": "^4.0",
+    "pestphp/pest-plugin-laravel": "^4.0",
+    "pestphp/pest-plugin-arch": "^4.0",
+    "larastan/larastan": "^3.0",
+    "phpstan/phpstan": "^2.0"
+  }
+}

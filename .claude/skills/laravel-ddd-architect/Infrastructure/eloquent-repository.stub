@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\{{BoundedContext}}\Persistence\Eloquent\Repositories;
+
+use App\Domain\{{BoundedContext}}\Entity\{{EntityName}};
+use App\Domain\{{BoundedContext}}\Repository\{{RepositoryName}};
+use App\Domain\{{BoundedContext}}\ValueObject\{{Id}};
+use App\Infrastructure\{{BoundedContext}}\Persistence\Eloquent\Mappers\{{EntityName}}Mapper;
+use App\Infrastructure\{{BoundedContext}}\Persistence\Eloquent\Models\{{EntityName}}Model;
+use Illuminate\Database\DatabaseManager;
+use Illuminate\Support\Str;
+
+final readonly class Eloquent{{RepositoryName}} implements {{RepositoryName}}
+{
+    public function __construct(
+        private DatabaseManager $db,
+        private {{EntityName}}Mapper $mapper,
+    ) {}
+
+    public function save({{EntityName}} $entity): void
+    {
+        $this->db->transaction(function () use ($entity) {
+            {{EntityName}}Model::query()->updateOrCreate(
+                ['id' => $entity->id->value],
+                $this->mapper->toRow($entity),
+            );
+        });
+    }
+
+    public function findById({{Id}} $id): ?{{EntityName}}
+    {
+        $model = {{EntityName}}Model::query()->find($id->value);
+
+        return $model ? $this->mapper->toDomain($model) : null;
+    }
+
+    public function nextId(): {{Id}}
+    {
+        return new {{Id}}((string) Str::uuid());
+    }
+}

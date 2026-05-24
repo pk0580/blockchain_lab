@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Application\{{BoundedContext}}\UseCase\{{UseCaseName}};
+
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\DatabaseManager;
+
+/**
+ * Medium-tier Action.
+ * Use directly with Eloquent models; no repository interface required.
+ */
+final readonly class {{UseCaseName}}Action
+{
+    public function __construct(
+        private DatabaseManager $db,
+        private Dispatcher $events,
+    ) {}
+
+    public function handle({{DTO}} $data): void
+    {
+        $this->db->transaction(function () use ($data) {
+            // implementation
+        });
+    }
+}

@@ -1,0 +1,102 @@
+<?php
+
+declare(strict_types=1);
+
+// =============================================================================
+// OPTION A — Pest arch() DSL (use when pestphp/pest is installed)
+// Run with: ./vendor/bin/pest --filter=arch
+// =============================================================================
+
+arch('domain has no framework imports')
+    ->expect('App\Domain\{{BoundedContext}}')
+    ->not->toUse(['Illuminate', 'Symfony', 'Eloquent', 'Carbon\Carbon']);
+
+arch('application has no http or eloquent imports')
+    ->expect('App\Application\{{BoundedContext}}')
+    ->not->toUse([
+        'Illuminate\Http',
+        'Illuminate\Database\Eloquent',
+        'Illuminate\Support\Facades\Auth',
+    ]);
+
+arch('actions are readonly')
+    ->expect('App\Application\{{BoundedContext}}')
+    ->classes()
+    ->toBeReadonly();
+
+arch('controllers are invokable and thin')
+    ->expect('App\Interface\Http\{{BoundedContext}}\Controller')
+    ->toBeClasses();
+
+arch('value objects are readonly')
+    ->expect('App\Domain\{{BoundedContext}}\ValueObject')
+    ->classes()
+    ->toBeReadonly();
+
+// =============================================================================
+// OPTION B — PHPUnit 12 (use when Pest is NOT installed)
+// Place in: {APP_ROOT}/tests/Architecture/{{BoundedContext}}ArchTest.php
+// =============================================================================
+
+/*
+namespace Tests\Architecture;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+
+final class {{BoundedContext}}ArchTest extends TestCase
+{
+    #[Test]
+    public function domain_has_no_framework_imports(): void
+    {
+        foreach ($this->phpFiles('Domain/{{BoundedContext}}') as $file) {
+            $src = file_get_contents($file);
+            $this->assertStringNotContainsString('use Illuminate\\', $src, "Framework leak in $file");
+            $this->assertStringNotContainsString('use Eloquent\\', $src, "Eloquent leak in $file");
+            $this->assertStringNotContainsString('use Symfony\\', $src, "Symfony leak in $file");
+            $this->assertStringNotContainsString('use Carbon\\Carbon', $src, "Mutable Carbon in $file");
+        }
+    }
+
+    #[Test]
+    public function application_has_no_http_or_eloquent(): void
+    {
+        foreach ($this->phpFiles('Application/{{BoundedContext}}') as $file) {
+            $src = file_get_contents($file);
+            $this->assertStringNotContainsString('use Illuminate\\Http', $src, "Http in Application: $file");
+            $this->assertStringNotContainsString(
+                'use Illuminate\\Database\\Eloquent',
+                $src,
+                "Eloquent in Application: $file",
+            );
+        }
+    }
+
+    #[Test]
+    public function value_objects_are_declared_readonly(): void
+    {
+        foreach ($this->phpFiles('Domain/{{BoundedContext}}/ValueObject') as $file) {
+            $src = file_get_contents($file);
+            $this->assertMatchesRegularExpression('/readonly\s+class\s+/', $src, "VO not readonly: $file");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+
+    private function phpFiles(string $relativeDir): iterable
+    {
+        $base = dirname(__DIR__) . '/app/' . $relativeDir;
+        if (!is_dir($base)) {
+            return;
+        }
+        $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base));
+        foreach ($it as $file) {
+            if ($file->getExtension() === 'php') {
+                yield $file->getPathname();
+            }
+        }
+    }
+}
+*/

@@ -1,0 +1,180 @@
+name: blockchain-lab
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-local}
+  APP_DEBUG: ${APP_DEBUG:-true}
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_DATABASE: ${DB_DATABASE:-blockchain_lab}
+  DB_USERNAME: ${DB_USERNAME:-app}
+  DB_PASSWORD: ${DB_PASSWORD:-app}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  QUEUE_CONNECTION: redis
+  CACHE_STORE: redis
+  SESSION_DRIVER: redis
+  SIGNING_SVC_URL: http://signing-svc:8080
+  SIGNING_SVC_BEARER_TOKEN: ${SIGNING_SVC_BEARER_TOKEN}
+  BITCOIN_RPC_URL: http://bitcoin-regtest:18443
+  BITCOIN_RPC_USER: ${BITCOIN_RPC_USER:-bitcoin}
+  BITCOIN_RPC_PASSWORD: ${BITCOIN_RPC_PASSWORD:-bitcoin}
+
+services:
+  app:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: blockchain-lab-app-1
+    working_dir: /var/www/html
+    volumes:
+      - ./src:/var/www/html
+      - composer-cache:/home/app/.composer
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [lab]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: blockchain-lab-nginx-1
+    ports:
+      - "${APP_PORT:-8000}:80"
+    volumes:
+      - ./src:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [app]
+    networks: [lab]
+
+  horizon:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: blockchain-lab-horizon-1
+    working_dir: /var/www/html
+    command: ["php", "artisan", "horizon"]
+    volumes:
+      - ./src:/var/www/html
+    environment:
+      <<: *app-env
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks: [lab]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: blockchain-lab-postgres-1
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-blockchain_lab}
+      POSTGRES_USER: ${DB_USERNAME:-app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-app}
+    ports:
+      - "${DB_PORT_EXTERNAL:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-app} -d ${DB_DATABASE:-blockchain_lab}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [lab]
+
+  redis:
+    image: redis:7-alpine
+    container_name: blockchain-lab-redis-1
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT_EXTERNAL:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [lab]
+
+  bitcoin-regtest:
+    image: ruimarinho/bitcoin-core:24
+    container_name: blockchain-lab-bitcoin-1
+    command:
+      - -regtest=1
+      - -server=1
+      - -rpcbind=0.0.0.0
+      - -rpcallowip=0.0.0.0/0
+      - -rpcuser=${BITCOIN_RPC_USER:-bitcoin}
+      - -rpcpassword=${BITCOIN_RPC_PASSWORD:-bitcoin}
+      - -fallbackfee=0.0002
+      - -txindex=1
+    ports:
+      - "${BITCOIN_RPC_PORT:-18443}:18443"
+    volumes:
+      - bitcoin-data:/home/bitcoin/.bitcoin
+    networks: [lab]
+
+  signing-svc:
+    build:
+      context: ./signing-svc
+      dockerfile: Dockerfile
+    container_name: blockchain-lab-signing-1
+    environment:
+      SIGNING_SVC_LISTEN_ADDR: ":8080"
+      SIGNING_SVC_LOG_LEVEL: "${SIGNING_SVC_LOG_LEVEL:-info}"
+      SIGNING_SVC_BEARER_TOKEN: "${SIGNING_SVC_BEARER_TOKEN}"
+      SIGNING_SVC_SEED_ENCRYPTION_KEY: "${SIGNING_SVC_SEED_ENCRYPTION_KEY}"
+      SIGNING_SVC_SEED_DIR: "/var/lib/signing-svc/seeds"
+    volumes:
+      - signing-seeds:/var/lib/signing-svc/seeds
+    ports:
+      - "${SIGNING_SVC_PORT_EXTERNAL:-8081}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [lab]
+
+  # Phase 8.1 — Frontend (Inertia + Vue) build container.
+  # Запускается через `make assets-dev` (HMR) или `make assets-build` (prod).
+  # Дефолтный command — `dev`, так что `docker compose up -d node` сразу даёт
+  # HMR на 5173. Volume общий с app:/var/www/html, потому что Laravel-Vite
+  # читает manifest.json из public/build, который пишет node.
+  node:
+    image: node:22-alpine
+    container_name: blockchain-lab-node-1
+    working_dir: /var/www/html
+    volumes:
+      - ./src:/var/www/html
+      - node-modules:/var/www/html/node_modules
+    # tail keeps the container alive so `docker exec` can run npm commands.
+    # User is root inside the container (it's a dev tool, не сетевой сервис);
+    # этого достаточно, чтобы named volume node-modules не упирался в EACCES.
+    command: ["sh", "-c", "tail -f /dev/null"]
+    networks: [lab]
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+
+volumes:
+  postgres-data:
+  redis-data:
+  bitcoin-data:
+  composer-cache:
+  signing-seeds:
+  node-modules:
+
+networks:
+  lab:
+    name: blockchain-lab

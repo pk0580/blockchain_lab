@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\{{BoundedContext}};
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+final class {{ControllerName}}Test extends TestCase
+{
+    use RefreshDatabase;
+
+    #[Test]
+    public function it_handles_the_happy_path(): void
+    {
+        $response = $this->actingAs(User::factory()->create())
+            ->postJson('/api/v1/{{route}}', [
+                // valid payload
+            ]);
+
+        $response->assertCreated();
+    }
+
+    #[Test]
+    public function it_returns_422_on_invalid_input(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->postJson('/api/v1/{{route}}', [])
+            ->assertUnprocessable();
+    }
+
+    #[Test]
+    public function it_rejects_unauthenticated_requests(): void
+    {
+        $this->postJson('/api/v1/{{route}}', [])->assertUnauthorized();
+    }
+}

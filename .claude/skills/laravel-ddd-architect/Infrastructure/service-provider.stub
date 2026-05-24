@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\{{BoundedContext}}\Provider;
+
+use App\Domain\{{BoundedContext}}\Entity\{{EntityName}};
+use App\Domain\{{BoundedContext}}\Repository\{{RepositoryName}};
+use App\Infrastructure\{{BoundedContext}}\Persistence\Eloquent\Repositories\Eloquent{{RepositoryName}};
+use App\Interface\Http\{{BoundedContext}}\Policy\{{EntityName}}Policy;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\ServiceProvider;
+
+final class {{BoundedContext}}ServiceProvider extends ServiceProvider
+{
+    /** @var array<class-string, class-string> */
+    public array $bindings = [
+        {{RepositoryName}}::class => Eloquent{{RepositoryName}}::class,
+    ];
+
+    public function boot(): void
+    {
+        // Policy lives outside Laravel's auto-discovery path
+        // (App\Interface\Http\{Ctx}\Policy), so we register it explicitly.
+        Gate::policy({{EntityName}}::class, {{EntityName}}Policy::class);
+    }
+}

@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\{{BoundedContext}}\Persistence\Eloquent\Mappers;
+
+use App\Domain\{{BoundedContext}}\Entity\{{EntityName}};
+use App\Domain\{{BoundedContext}}\ValueObject\{{Id}};
+use App\Infrastructure\{{BoundedContext}}\Persistence\Eloquent\Models\{{EntityName}}Model;
+
+final class {{EntityName}}Mapper
+{
+    /** @return array<string, mixed> */
+    public function toRow({{EntityName}} $entity): array
+    {
+        return [
+            'id' => $entity->id->value,
+            // other columns
+        ];
+    }
+
+    public function toDomain({{EntityName}}Model $model): {{EntityName}}
+    {
+        return {{EntityName}}::reconstitute(
+            new {{Id}}((string) $model->id),
+        );
+    }
+}

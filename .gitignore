@@ -1,0 +1,54 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+*.Zone.Identifier
+
+# Local config
+.env
+.env.local
+.env.*.local
+.claude/settings.local.json
+
+# Docker / build artefacts
+docker/**/data/
+
+# Laravel app artefacts (under src/)
+src/vendor/
+src/node_modules/
+src/public/build/
+src/public/hot
+src/storage/*.key
+src/storage/app/*
+!src/storage/app/.gitkeep
+src/storage/app/public/*
+!src/storage/app/public/.gitkeep
+src/storage/framework/cache/data/*
+!src/storage/framework/cache/data/.gitkeep
+src/storage/framework/sessions/*
+!src/storage/framework/sessions/.gitkeep
+src/storage/framework/testing/*
+!src/storage/framework/testing/.gitkeep
+src/storage/framework/views/*
+!src/storage/framework/views/.gitkeep
+src/storage/logs/*
+!src/storage/logs/.gitkeep
+src/bootstrap/cache/*
+!src/bootstrap/cache/.gitkeep
+
+# Coverage / build
+coverage/
+.phpunit.result.cache
+.phpstan-cache/
+.phpunit.cache/
+
+# Tooling
+.idea/
+.vscode/
+.fleet/
+*.swp
+
+# Keys (extra safety — secret-guard.sh also blocks)
+*.pem
+*.key
+secrets.json
+credentials.json

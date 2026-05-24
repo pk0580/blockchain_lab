@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\{{BoundedContext}}\Entity;
+
+use App\Domain\{{BoundedContext}}\ValueObject\{{Id}};
+
+final class {{EntityName}}
+{
+    private function __construct(
+        public readonly {{Id}} $id,
+        // PHP 8.4 asymmetric visibility for properties with invariants
+        // public private(set) string $name,
+    ) {}
+
+    public static function create({{Id}} $id): self
+    {
+        $entity = new self($id);
+        // record domain events, set default state
+        return $entity;
+    }
+
+    /** Restore from persistence — no events, no default initialization. */
+    public static function reconstitute({{Id}} $id): self
+    {
+        return new self($id);
+    }
+}

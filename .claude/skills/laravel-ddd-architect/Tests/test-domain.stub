@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\Domain\{{BoundedContext}};
+
+use App\Domain\{{BoundedContext}}\Entity\{{EntityName}};
+use App\Domain\{{BoundedContext}}\ValueObject\{{Id}};
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+final class {{EntityName}}Test extends TestCase
+{
+    #[Test]
+    public function it_creates_an_entity(): void
+    {
+        $entity = {{EntityName}}::create(new {{Id}}('00000000-0000-0000-0000-000000000001'));
+
+        $this->assertSame('00000000-0000-0000-0000-000000000001', $entity->id->value);
+    }
+}

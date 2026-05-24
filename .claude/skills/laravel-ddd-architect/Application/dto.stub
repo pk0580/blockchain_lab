@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Application\{{BoundedContext}}\UseCase\{{UseCaseName}};
+
+final readonly class {{DTO}}
+{
+    public function __construct(
+        // public string $foo,
+        // public int $bar,
+    ) {}
+
+    public static function fromArray(array $validated): self
+    {
+        return new self(
+            // foo: $validated['foo'],
+            // bar: (int) $validated['bar'],
+        );
+    }
+}
