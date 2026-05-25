@@ -8,7 +8,7 @@
 > Структура: Module-First DDD в `src/app/Modules/{Context}/{Domain,Application,Infrastructure,UI}`.
 > Стек данных: PostgreSQL 16 + Redis 7 + Horizon.
 
-Актуальный план реализации см. в [`STEPS.md`](STEPS.md). Подробности архитектуры — в [`docs/architecture/`](docs/architecture/).
+Подробности архитектуры — в [`docs/architecture/`](docs/architecture/).
 
 ---
 
@@ -105,14 +105,6 @@ blockchain-lab/
 - Хук `secret-guard.sh` блокирует случайные коммиты `.env`, `.pem`, `id_rsa` и известных паттернов API-ключей.
 
 См. [`docs/architecture/decisions/0002-go-signing-service.md`](docs/architecture/decisions/0002-go-signing-service.md).
-
-## Разработка
-
-1. Выберите фазу из [`STEPS.md`](STEPS.md).
-2. Используйте навык `laravel-ddd-architect` для проектирования.
-3. Генерируйте код через агентов (`module-scaffolder`, `test-writer`), когда это уместно.
-4. Выполняйте `make pint && make stan && make test` локально.
-5. Открывайте PR; проверки безопасности / DDD / производительности настроены как агенты Claude Code.
 
 ## Лицензия
 
