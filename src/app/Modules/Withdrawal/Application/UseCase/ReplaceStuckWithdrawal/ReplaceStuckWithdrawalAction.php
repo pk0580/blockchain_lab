@@ -27,24 +27,29 @@ use Illuminate\Database\DatabaseManager;
 use RuntimeException;
 
 /**
- * Заменяет «зависший» withdrawal:
+ * Замена «зависшего» withdrawal с повышенной комиссией.
  *
- *  - **BTC:** BIP-125 RBF. Те же UTXO, sequence < 0xfffffffe, fee × bump.
- *  - **EVM:** тот же nonce, fee × bump.
+ * Логика по семействам (GUIDE.md, Урок 11 «Замена»):
+ *   - BTC: BIP-125 RBF. Те же UTXO, sequence < 0xfffffffe, fee × bump.
+ *   - EVM: тот же nonce, fee × bump.
  *
- * Поведение:
- *  1. Загружаем оригинал по `originalWithdrawalId`. Если он уже не Stuck —
- *     no-op (idempotency: listener мог дважды дернуться).
- *  2. Считаем новые fee-поля = старые × `withdrawal.rbf.fee_multiplier_bps`/10000.
- *  3. TxBuilder::rebuild → SigningClient::signRawTx → ChainAdapter::broadcast.
- *  4. Создаём новый Withdrawal (`replacement_of = original`), сохраняем
- *     в трёх транзакциях (Built → Signed → Broadcasted) тем же приёмом,
- *     что и `RequestWithdrawalAction`.
- *  5. Оригинал помечаем `markAsReplaced(new_id)` + сохраняем.
+ * Алгоритм:
+ *  1. Загружаем оригинал. Если статус ≠ Stuck → no-op (первая защита от
+ *     двойной замены: между событием и обработкой могло прийти подтверждение).
+ *  2. Ищем withdrawal по `idempotency_key = "rbf:{original_id}"`.
+ *     Если есть — кто-то уже создал замену, выходим (вторая защита).
+ *  3. bumpFee: новые fee-поля = старые × `withdrawal.rbf.fee_multiplier_bps` / 10000.
+ *     По умолчанию 12500 = 125% (т.е. +25%, EIP-1559 требует ≥10–12.5%).
+ *  4. TxBuilder::rebuild — пересборка с теми же входами/nonce.
+ *  5. Build → Sign → Broadcast в трёх транзакциях (как {@see RequestWithdrawalAction}).
+ *  6. В финальной транзакции перепроверяем статус оригинала: если всё ещё Stuck —
+ *     markAsReplaced. Если уже Confirmed (пришло подтверждение прямо перед нами) —
+ *     просто сохраняем replacement, конкурирующая tx будет отвергнута сетью.
  *
- * Идемпотентность на уровне БД: новый withdrawal получает
- * `idempotency_key = "rbf:{original_id}"` — UNIQUE constraint спасёт от
- * дублирования при повторной доставке `WithdrawalStuck`.
+ * ⚠️ Идемпотентность на уровне БД: UNIQUE constraint на `idempotency_key`
+ * спасёт от дубликата при повторной доставке `WithdrawalStuck`.
+ *
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 final readonly class ReplaceStuckWithdrawalAction
 {
@@ -164,6 +169,17 @@ final readonly class ReplaceStuckWithdrawalAction
         );
     }
 
+    /**
+     * Поднятие комиссии для RBF/resend (GUIDE.md, Урок 11, шаг 3).
+     *
+     * bps = базисные пункты: 10000 = 100%, 12500 = 125% (+25% к оригиналу).
+     * Любое значение ≤10000 — баг конфига: replacement обязан платить больше.
+     *
+     * ⚠️ BTC: новый sat_per_vbyte = max(prev+1, prev * bps/10000) — гарантируем
+     * минимум +1 сатоши/vbyte (min-relay requirement BIP-125).
+     * ⚠️ EVM: умножаем max_fee_per_gas и max_priority_fee_per_gas через bcmath,
+     * потому что wei — это строки до 40 цифр.
+     */
     private function bumpFee(FeeQuoteSnapshot $original, ChainFamily $family): FeeQuoteSnapshot
     {
         $bps = (int) $this->config->get('withdrawal.rbf.fee_multiplier_bps', 12500);

@@ -12,8 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Лента последних 20 ledger entries + breakdown по статусам. count(*) дешёвый
- * пока таблица маленькая — для production добавим materialized view, но это
- * task для Phase 9.
+ * пока таблица маленькая — для production стоит добавить materialized view.
  */
 final readonly class EloquentLedgerOverviewProvider implements LedgerOverviewProvider
 {

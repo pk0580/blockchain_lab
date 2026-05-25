@@ -17,7 +17,7 @@ Artisan::command('inspire', function () {
 
 /*
 |--------------------------------------------------------------------------
-| Phase 6.3 — per-chain polling
+| Withdrawal: per-chain polling
 |--------------------------------------------------------------------------
 | Каждые 30 секунд диспатчим `WatchWithdrawalConfirmationsJob` на per-chain
 | очередь `confirmations.{chain}`. Каждые 60 секунд — `WatchStuckWithdrawalsJob`
@@ -50,7 +50,7 @@ Schedule::call(function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| Phase 7.1 — NodeHealth probe
+| NodeHealth probe
 |--------------------------------------------------------------------------
 | Per-chain probe каждые 30 секунд. ProbeChainEndpointsJob ставится на очередь
 | `health.{chain_id}` чтобы провисший endpoint одной chain не задерживал probing
@@ -68,7 +68,7 @@ Schedule::call(function (): void {
 
 /*
 |--------------------------------------------------------------------------
-| Phase 7.2 — Webhook через Outbox pattern
+| Webhook через Outbox pattern
 |--------------------------------------------------------------------------
 | - PublishOutboxJob (every minute): берёт unpublished outbox messages, делает
 |   fan-out в matching subscriptions, создаёт WebhookDeliveries.
@@ -87,7 +87,7 @@ Schedule::job(new DispatchDueDeliveriesJob())
 
 /*
 |--------------------------------------------------------------------------
-| Phase 7.3 — Idempotency cleanup
+| Idempotency cleanup
 |--------------------------------------------------------------------------
 | Раз в сутки удаляем просроченные записи (expires_at <= now). TTL по умолчанию
 | 24h, поэтому daily cleanup гарантирует ограниченный объём таблицы.

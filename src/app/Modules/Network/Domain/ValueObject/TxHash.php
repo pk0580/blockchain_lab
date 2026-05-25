@@ -6,6 +6,18 @@ namespace App\Modules\Network\Domain\ValueObject;
 
 use InvalidArgumentException;
 
+/**
+ * Хеш транзакции — детерминированный отпечаток сериализованной транзакции.
+ * Возвращается сетью при broadcast и используется как единственный «адрес»,
+ * по которому можно найти транзакцию: `eth_getTransactionByHash` (EVM),
+ * `getrawtransaction` (Bitcoin).
+ *
+ * В Bitcoin исторический хеш и witness-хеш могут различаться (txid vs wtxid);
+ * для пользователей и для broadcast мы используем txid.
+ *
+ * @see \GUIDE.md  Урок 1 (#урок-1--что-такое-блокчейн)
+ * @see \GUIDE.md  Урок 6 (#урок-6--подтверждения-и-финализация) — наблюдение по hash
+ */
 final readonly class TxHash
 {
     public function __construct(public string $value)

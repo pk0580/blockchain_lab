@@ -31,25 +31,40 @@ use Illuminate\Database\DatabaseManager;
 use Throwable;
 
 /**
- * Оркестратор для POST /api/v1/withdrawals. Шаги:
+ * Оркестратор `POST /api/v1/withdrawals`.
  *
- *  1. Идемпотентность: ищем по `Idempotency-Key`. Если запись уже существует,
- *     сверяем отпечаток (fingerprint) и либо возвращаем существующую запись, либо выбрасываем 409.
- *  2. Загружаем Chain, определяем горячий кошелек (config + SigningClient::deriveAddress).
- *  3. Запрашиваем Fee::Application::EstimateFeeAction — получаем снимок (snapshot) (без
- *     импорта Fee::Domain в этот модуль, см. fromPrimitives/toSnapshot).
- *  4. Для EVM аллоцируем nonce через NonceAllocator (для BTC — пропускаем).
- *  5. TxBuilder строит неподписанную транзакцию (Withdrawal::Domain::BuiltTransaction).
- *  6. Сохраняем Withdrawal со статусом Requested → markAsBuilt → save (COMMIT).
- *  7. SigningClient::signRawTx → markAsSigned → save (COMMIT).
- *  8. ChainAdapter::broadcast → markAsBroadcasted → save (COMMIT) → генерация событий.
+ * Полный алгоритм — GUIDE.md, Урок 10 «Оркестрация: RequestWithdrawalAction».
  *
- * Каждый шаг выполняется в собственной транзакции на случай сбоя в промежутке, чтобы
- * частичное состояние было доступно для polling-job'а Фазы 6.3. Любой сбой
- * приводит к withdrawal.fail() + 5xx с осмысленным сообщением.
+ * Шаги:
+ *  1. Идемпотентность по `Idempotency-Key`:
+ *     - запись существует и fingerprint совпал  → вернуть существующую (reused=true);
+ *     - запись существует и fingerprint другой  → 409 IdempotencyConflict.
+ *  2. ChainPauseRegistry::isPaused — иначе ChainPausedException → HTTP 503 (Урок 11).
+ *  3. Загрузить Chain, определить горячий кошелёк (HotWalletResolver).
+ *  4. Fee::EstimateFeeAction → FeeQuoteSnapshot в withdrawal (Урок 9).
+ *  5. Для EVM — выделить nonce (NonceAllocator). Для BTC — пропустить (нет nonce).
+ *  6. Withdrawal::request — статус Requested.
+ *  7. Build → Sign → Broadcast в ТРЁХ отдельных транзакциях:
+ *     - TxBuilder::build()  → COMMIT (markAsBuilt).
+ *     - SigningClient::signRawTx() → COMMIT (markAsSigned).
+ *     - ChainAdapter::broadcast() → COMMIT (markAsBroadcasted) + диспатч событий.
  *
- * Прямых импортов Domain из других модулей нет: Fee передается через Application DTO,
+ * ⚠️ Почему три транзакции, а не одна (GUIDE §10, конец «Оркестрация»):
+ * если упасть посередине, состояние всё равно в БД. Polling-задача увидит
+ * «есть Built, но не Signed» → продолжит со следующего шага. Withdrawal —
+ * возобновляемый процесс. Альтернатива «всё в одной транзакции» оставила бы
+ * нас с потерянными подписями и неотправленными байтами — а это деньги.
+ *
+ * Любая ошибка вызывает {@see failQuietly()} → клиент получает 5xx.
+ * Идемпотентность защищена на трёх уровнях (GUIDE §10):
+ *   1) HTTP middleware (Modules/Idempotency, Урок 12);
+ *   2) локальный findByIdempotencyKey + UNIQUE в `withdrawals`;
+ *   3) идемпотентность по `replacementOf` для RBF (Урок 11).
+ *
+ * Импортов Domain из других модулей нет: Fee передаётся через Application DTO,
  * Network — через общее ядро (Chain, Address, ChainAdapter, SigningClient).
+ *
+ * @see \GUIDE.md  Урок 10 (#урок-10--вывод-средств-withdrawal)
  */
 final readonly class RequestWithdrawalAction
 {
@@ -73,21 +88,27 @@ final readonly class RequestWithdrawalAction
     {
         $now = $this->clock ?? new DateTimeImmutable();
 
+        // Шаг 1 (GUIDE §10): идемпотентность.
+        // Defence-in-depth — на случай, если HTTP-middleware не отработал.
         $existing = $this->repo->findByIdempotencyKey($data->idempotencyKey);
         if ($existing !== null) {
             $this->assertSameFingerprint($existing, $data);
             return new RequestWithdrawalResult($existing, reused: true);
         }
 
+        // Шаг 2 (GUIDE §10 + §11): пауза сети (после слишком глубокого reorg).
         if ($this->pauses->isPaused($data->chainId)) {
             throw ChainPausedException::forChain($data->chainId);
         }
 
+        // Шаг 3 (GUIDE §10): сеть + горячий кошелёк (адрес-источник).
         $chain = $this->chains->findById($data->chainId)
             ?? throw ChainNotFoundException::byId($data->chainId);
 
         $hot = $this->hotWallets->resolve($chain);
 
+        // Шаг 4 (GUIDE §9, §10): оценка комиссии. Снимок (FeeQuoteSnapshot)
+        // кладётся в withdrawal — он зафиксирован на момент request, не пересчитывается.
         $snapshot = $this->fees->handle(
             EstimateFeeData::fromPrimitives($data->chainId->value, $data->priority),
         )->toSnapshot();
@@ -98,6 +119,7 @@ final readonly class RequestWithdrawalAction
             estimatedAt: $snapshot->estimatedAt,
         );
 
+        // Шаг 5 (GUIDE §10): nonce — только для EVM (Bitcoin nonce не использует, см. Урок 3).
         $nonce = $chain->family === ChainFamily::Evm
             ? $this->nonces->allocate($chain, $hot->address)
             : null;
@@ -125,6 +147,10 @@ final readonly class RequestWithdrawalAction
         return new RequestWithdrawalResult($withdrawal, reused: false);
     }
 
+    /**
+     * Шаг 7 GUIDE §10: build → sign → broadcast в трёх отдельных транзакциях,
+     * чтобы withdrawal был возобновляемым процессом (см. docblock класса).
+     */
     private function buildSignBroadcast(
         Withdrawal $withdrawal,
         Chain $chain,
@@ -133,6 +159,7 @@ final readonly class RequestWithdrawalAction
         ?NonceValue $nonce,
         DateTimeImmutable $now,
     ): void {
+        // 7a: Build — TxBuilder собирает unsigned rawHex + signingExtras.
         $builder = $this->builders->for($chain->family);
         $built = $builder->build(
             chain: $chain,
@@ -148,6 +175,7 @@ final readonly class RequestWithdrawalAction
             $this->repo->save($withdrawal);
         });
 
+        // 7b: Sign — приватный ключ остаётся в signing-svc (GUIDE §2).
         $signed = $this->signing->signRawTx(
             family: $chain->family,
             seedReference: $hot->seedReference,
@@ -161,6 +189,7 @@ final readonly class RequestWithdrawalAction
             $this->repo->save($withdrawal);
         });
 
+        // 7c: Broadcast — отправляем подписанную tx в mempool сети.
         $adapter = $this->adapters->adapterFor($chain->id);
         $txHash = $adapter->broadcast(new SignedRawTx($chain->family, $signed->hex));
 

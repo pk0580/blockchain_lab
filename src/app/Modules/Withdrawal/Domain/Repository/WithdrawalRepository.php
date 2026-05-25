@@ -11,10 +11,10 @@ use App\Modules\Withdrawal\Domain\ValueObject\WithdrawalId;
 use DateTimeImmutable;
 
 /**
- * Узкий aggregate-scoped репозиторий. Phase 6.2 — point-lookups; Phase 6.3
- * добавляет два списковых запроса для polling-job'ов (confirmations + stuck).
+ * Узкий aggregate-scoped репозиторий: point-lookups плюс два списковых запроса
+ * для polling-job'ов (confirmations + stuck).
  * Это сознательно остаётся write-репозиторием: возвращаем aggregate'ы, не DTO.
- * Полноценный CQRS-read будет жить отдельным `WithdrawalReadRepository` (Phase 7+).
+ * Полноценный CQRS-read должен жить в отдельном `WithdrawalReadRepository`.
  */
 interface WithdrawalRepository
 {

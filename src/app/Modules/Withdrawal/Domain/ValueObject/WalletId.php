@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 /**
  * Локальный VO Withdrawal::Domain. Не импортируем будущий `Wallet::Domain` —
- * Phase 6 ещё его не построил. Контракт: kebab-case / uuid / opaque-id.
+ * этот bounded context ещё не построен. Контракт: kebab-case / uuid / opaque-id.
  */
 final readonly class WalletId
 {

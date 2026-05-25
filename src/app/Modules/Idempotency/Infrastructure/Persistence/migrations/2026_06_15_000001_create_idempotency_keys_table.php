@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Phase 7.3 — Глобальный idempotency store.
+ * Глобальный idempotency store.
  *
  *  - `key` — клиентский UUID/ULID/etc, длина 8..120 (см. VO).
  *  - `request_hash` — sha256(method + path + body), 64 hex chars.

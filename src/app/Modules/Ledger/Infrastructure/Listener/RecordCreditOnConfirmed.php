@@ -12,12 +12,16 @@ use Illuminate\Contracts\Container\Container;
 use Psr\Log\LoggerInterface;
 
 /**
- * Слушатель Confirmation-события. Owner резолвится в Action; если адрес
- * принадлежит «чужому» (не нашему) кошельку — Action бросит
- * WalletOwnershipMissingException. На этом уровне просто пишем warning'ом
- * в лог, потому что не каждое подтверждение нашего «watched» адреса означает
- * принадлежность одному из наших кошельков (например, тестовая регистрация
- * в Directory без wallet_id в таблице addresses).
+ * Мост Confirmation::TransactionConfirmed → Ledger::RecordLedgerCredit.
+ *
+ * Запускает зачисление при достижении requiredConfirmations
+ * (см. GUIDE.md, Урок 8 «Зачисление при подтверждении»).
+ *
+ * WalletOwnershipMissingException гасится в warning: не каждое подтверждение
+ * нашего «watched» адреса означает принадлежность нашему кошельку — например,
+ * адрес мог быть зарегистрирован в Directory без wallet_id.
+ *
+ * @see \GUIDE.md  Урок 8 (#урок-8--двойная-бухгалтерия-ledger)
  */
 final readonly class RecordCreditOnConfirmed
 {

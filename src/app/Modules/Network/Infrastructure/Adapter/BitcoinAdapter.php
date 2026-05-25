@@ -23,12 +23,18 @@ use App\Modules\Network\Infrastructure\Registry\ConfirmationBasedFinality;
 use Throwable;
 
 /**
- * Live BitcoinAdapter for the bitcoin family. Defers head + health to a
- * BlockSource (one BitcoinCoreBlockSource per Chain) and address validation
- * to the signing service (`/v1/addresses/validate`). Fee estimation is a
- * stub here — the Fee module owns the production estimator (Phase 6.1).
+ * Live BitcoinAdapter — реализация {@see ChainAdapter} для семейства Bitcoin.
  *
- * Phase 6.2 adds broadcast() — `sendrawtransaction` against bitcoind.
+ * Обязанности адаптера семейства (GUIDE.md, Урок 4):
+ *  - currentHead() — текущая вершина цепи (для сканера и подтверждений);
+ *  - broadcast()  — `sendrawtransaction` в bitcoind;
+ *  - addressValidator() — валидация адресов через signing-svc;
+ *  - feeEstimator() — здесь stub; реальный оценщик — {@see \App\Modules\Fee}.
+ *
+ * Head/health делегируется в {@see BlockSource} (один BitcoinCoreBlockSource на Chain),
+ * валидация адресов — в signing-svc (`/v1/addresses/validate`).
+ *
+ * @see \GUIDE.md  Урок 4 (#урок-4--l1-l2-и-семейства-сетей)
  */
 final readonly class BitcoinAdapter implements ChainAdapter, AddressValidator, FeeEstimator
 {

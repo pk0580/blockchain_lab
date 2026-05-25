@@ -8,6 +8,18 @@ use App\Modules\Address\Application\UseCase\CreateHdSeed\CreateHdSeedAction;
 use App\Modules\Address\Application\UseCase\CreateHdSeed\CreateHdSeedData;
 use Illuminate\Console\Command;
 
+/**
+ * CLI-команда первоначальной настройки prod: создать (или импортировать) HD-сид.
+ *
+ * Типичные сценарии — см. GUIDE.md, Урок 2, раздел «Ссылка на ключ»:
+ *
+ *   php artisan address:seed:create prod-hot-001 --family=evm
+ *   php artisan address:seed:create prod-hot-001 --family=evm --mnemonic="...12 words..."
+ *
+ * Сама команда тонкая: только парсит аргументы и зовёт {@see CreateHdSeedAction}.
+ *
+ * @see \GUIDE.md  Урок 2 (#урок-2--ключи-адреса-и-hd-кошельки)
+ */
 final class CreateHdSeedCommand extends Command
 {
     /** @var string */

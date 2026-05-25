@@ -11,8 +11,15 @@ import (
 
 // evmAdapter обрабатывает Ethereum и любую EVM-совместимую сеть (Polygon,
 // Arbitrum, Base, Optimism, …). Формат адреса у них идентичен —
-// различается селектор сети (chain id), используемый при подписании
-// транзакции, который Фаза 6 подключит при добавлении эндпоинта подписи.
+// различается только chain_id, используемый при подписании транзакции
+// (EIP-155 replay protection).
+//
+// Алгоритм адреса (GUIDE.md, Урок 2 «Криптография за кулисами», вариант EVM):
+//
+//	address = "0x" + last20(keccak256(uncompressed_pubkey_without_0x04_prefix))
+//
+// Поверх — EIP-55 checksum-encoding (смешанный регистр шестнадцатеричных цифр).
+// Путь деривации BIP-44: m/44'/60'/account'/change/index (SLIP-44 coin = 60).
 type evmAdapter struct{}
 
 func newEvmAdapter() *evmAdapter { return &evmAdapter{} }
@@ -32,14 +39,20 @@ func uncompressedPubkey(child *bip32.Key) ([]byte, error) {
 	return ethcrypto.FromECDSAPub(&priv.PublicKey), nil
 }
 
+// Address выводит EVM-адрес из дочернего HD-ключа (GUIDE.md, Урок 2):
+//
+//  1. uncompressed pubkey = 0x04 || X || Y (65 байт).
+//  2. addr = last20(keccak256(pubkey без префикса 0x04))  →  20 байт.
+//  3. checksum-encoding по EIP-55 (.Hex() ставит регистр).
 func (a *evmAdapter) Address(child *bip32.Key) (string, error) {
 	pub, err := uncompressedPubkey(child)
 	if err != nil {
 		return "", err
 	}
-	// EVM addr = последние 20 байт keccak256(uncompressed_pubkey_without_0x04_prefix)
+	// pub[1:] отбрасывает префиксный байт 0x04 (uncompressed marker), который не
+	// участвует в вычислении адреса.
 	addrBytes := ethcrypto.Keccak256(pub[1:])[12:]
-	return ethcommon.BytesToAddress(addrBytes).Hex(), nil // с контрольной суммой EIP-55
+	return ethcommon.BytesToAddress(addrBytes).Hex(), nil // EIP-55 checksum encoding
 }
 
 var evmAddrRegexp = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)

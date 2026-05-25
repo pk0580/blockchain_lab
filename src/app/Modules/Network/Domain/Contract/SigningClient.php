@@ -13,8 +13,8 @@ use App\Modules\Network\Domain\ValueObject\SignedRawTx;
  * Реализация для продакшена — {@see \App\Modules\Network\Infrastructure\Signer\HttpSigningClient};
  * в тестах используются фейки через сервис-провайдер.
  *
- * Интерфейс Фазы 2: деривация + валидация. Фаза 6.2 вводит подписание
- * необработанных транзакций (raw-tx), когда контексту вывода (Withdrawal) потребуются неподписанные транзакции.
+ * Контракт включает деривацию адресов, валидацию и подписание raw-транзакций
+ * (нужно Withdrawal-модулю для отправки исходящих).
  */
 interface SigningClient
 {

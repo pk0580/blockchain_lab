@@ -14,5 +14,5 @@ Route::get('/lessons/{slug}', ShowLessonController::class)
     ->where('slug', '[a-z0-9-]+')
     ->name('lessons.show');
 
-// Phase 8.4 — admin dashboard (initial render via Inertia; polling JSON см. routes/api.php).
+// Admin dashboard (initial render via Inertia; polling JSON см. routes/api.php).
 Route::get('/admin', ShowAdminDashboardController::class)->name('admin.dashboard');

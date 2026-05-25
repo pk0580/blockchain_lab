@@ -11,13 +11,18 @@ use DateTimeImmutable;
 use Illuminate\Database\DatabaseManager;
 
 /**
- * Помечает Broadcasted-записи как Stuck, если они «висят» дольше TTL
- * (`config('withdrawal.stuck_after_seconds')`). После пометки эмитится
- * `WithdrawalStuck`; листенер `ReplaceStuckWithdrawal` подхватит и инициирует
- * RBF (BTC) / resend (EVM).
+ * Помечает Broadcasted-withdrawals как Stuck, если они висят дольше TTL.
  *
- * Каждая запись помечается в собственной транзакции, чтобы сбой на одной не
- * заблокировал прогресс по остальным.
+ * Зачем — GUIDE.md, Урок 11 «Как мы это ловим»:
+ *   - find all Broadcasted, у которых broadcastAt < now − stuckAfterSeconds;
+ *   - для каждой markAsStuck($now) в своей транзакции;
+ *   - поднять WithdrawalStuck → его слушает {@see ReplaceOnWithdrawalStuck}
+ *     и инициирует RBF (BTC) / resend (EVM).
+ *
+ * Каждая запись помечается в собственной транзакции: сбой на одной не
+ * блокирует прогресс по остальным.
+ *
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 final readonly class MarkStuckWithdrawalsAction
 {

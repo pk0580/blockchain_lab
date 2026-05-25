@@ -11,7 +11,7 @@ interface WithdrawalConfirmationLookupRegistry
 {
     /**
      * @throws UnsupportedConfirmationLookupException если для семейства лукапа нет
-     *         (Tron в Phase 6.3 — NoOp, конкретные тиры подключим в Phase 7+).
+     *         (Tron — NoOp; конкретный lookup будет подключён позже).
      */
     public function for(ChainFamily $family): WithdrawalConfirmationLookup;
 }

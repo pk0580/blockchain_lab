@@ -35,7 +35,7 @@ uses(RefreshDatabase::class);
  * Чтобы запустить: запустить `bitcoin-regtest` контейнер и установить
  * `BITCOIN_LIVE_TESTS=1` в окружении (или в phpunit.xml).
  *
- * Сценарий ровно тот, что описан в STEPS.md §6 Phase 5:
+ * Сценарий ровно тот, что описан в STEPS.md §6:
  *   1. Mine 101 → coinbase созревает.
  *   2. sendtoaddress на наш «watched» адрес.
  *   3. Mine 6 → tx достигает confirmed.

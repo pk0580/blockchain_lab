@@ -18,16 +18,21 @@ use App\Modules\Withdrawal\Domain\ValueObject\WithdrawalAmount;
 use RuntimeException;
 
 /**
- * Готовит неподписанную (unsigned) EIP-1559 (тип 2) транзакцию. RLP-сериализация и подпись
- * выполняются в Go signing-svc — здесь мы лишь упаковываем поля в hex и
- * передаём всё в "signing extras", откуда `HttpSigningClient::signRawTx`
- * их подхватит. То есть `rawHex` в Фазе 6.2 является детерминированным
- * плейсхолдером (`tx-pending-{chainId}-{nonce}`); реальный RLP формируется
- * подписантом на основе `signingExtras`. Когда мы захотим подписывать локально или
- * валидировать на стороне Laravel — мы заменим плейсхолдер на полноценную RLP-сборку.
+ * Готовит неподписанную (unsigned) EIP-1559 (тип 2) транзакцию для EVM-сетей.
  *
- * Такой выбор соответствует принципу «приватные ключи никогда не покидают
- * signing-svc»: PHP знает поля транзакции, но не выполняет криптографию.
+ * Поля транзакции (см. GUIDE.md, Урок 3 «Аккаунт-модель»): `chain_id`, `nonce`,
+ * `max_fee_per_gas_wei`, `max_priority_fee_per_gas_wei`, `gas_limit`, `to`, `value_wei`.
+ * Описание EIP-1559 (base fee + priority fee) — GUIDE.md, Урок 9.
+ *
+ * ⚠️ PHP НЕ делает RLP-сериализацию сам. Все поля транзакции упаковываются в
+ * `signingExtras`, а в `rawHex` кладётся детерминированный плейсхолдер
+ * `tx-pending-{chainId}-{nonce}`. Реальный RLP собирает Go signing-svc на
+ * основе `signingExtras` — так PHP остаётся в стороне от криптографии
+ * (принцип «приватные ключи никогда не покидают signing-svc», GUIDE §2).
+ *
+ * @see \GUIDE.md  Урок 3 (#урок-3--транзакция-utxo-против-аккаунта)
+ * @see \GUIDE.md  Урок 9 (#урок-9--комиссия-fee)
+ * @see \GUIDE.md  Урок 10 (#урок-10--вывод-средств-withdrawal)
  */
 final readonly class EvmTxBuilder implements TxBuilder
 {
@@ -99,9 +104,11 @@ final readonly class EvmTxBuilder implements TxBuilder
         if ($previousNonce === null) {
             throw new RuntimeException('EvmTxBuilder::rebuild требует оригинальный nonce.');
         }
-        // Замена в EVM = тот же nonce + повышенный газ. Это не "RBF" в
-        // строгом смысле, но любой EVM-узел заменит ожидающую (pending) транзакцию с тем же
-        // (from, nonce) при достаточной разнице в цене газа (обычно >=10%-12.5%).
+        // Замена в EVM = тот же nonce + повышенный газ.
+        // ⚠️ Это не "RBF" в строгом смысле Bitcoin BIP-125, но любой EVM-узел
+        // заменит pending-транзакцию с тем же (from, nonce) при достаточной
+        // разнице в цене газа (обычно ≥10–12.5%).
+        // См. GUIDE.md, Урок 11, раздел «Замена» (шаг 5b).
         return $this->build($chain, $from, $to, $amount, $fee, $previousNonce);
     }
 

@@ -13,9 +13,15 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 
 /**
- * Per-chain tick для пометки stuck-withdrawals. TTL `withdrawal.stuck_after_seconds`
- * читается из конфига внутри `handle()`, чтобы планировщик можно было пересобрать
- * без рекомпиляции job'а.
+ * Per-chain тик для пометки stuck-withdrawals.
+ *
+ * Очередь — `withdrawals.{chainId}` (bulkhead: один зависший Bitcoin не валит
+ * EVM-обработку, см. GUIDE.md, Урок 12.5).
+ *
+ * TTL `withdrawal.stuck_after_seconds` читается из конфига внутри handle(),
+ * чтобы планировщик можно было пересобрать без рекомпиляции job'а.
+ *
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 final class WatchStuckWithdrawalsJob implements ShouldQueue
 {

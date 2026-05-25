@@ -23,11 +23,19 @@ use App\Modules\Network\Infrastructure\Rpc\EvmJsonRpc;
 use Throwable;
 
 /**
- * Live EVM adapter — обслуживает Sepolia, Polygon Amoy, любую EVM-совместимую
- * сеть. Все семейство-зависимые операции (currentHead, broadcast) ходят в
- * {@see EvmJsonRpc}; fee estimation остаётся за {@see \App\Modules\Fee} модулем,
- * здесь — лишь stub-метод feeEstimator(), который возвращает себя (методы
- * estimate() не вызываются, потому что Phase 6.2 не пользуется ChainAdapter::feeEstimator).
+ * Live EVM adapter — реализация {@see ChainAdapter} для семейства EVM.
+ *
+ * Один и тот же класс обслуживает Sepolia, Polygon Amoy, Arbitrum, Optimism, Base
+ * и любую другую EVM-совместимую сеть. В этом и есть смысл «семейства» — см.
+ * GUIDE.md, Урок 4: «с точки зрения интеграции L2 — это просто ещё один EVM».
+ *
+ * Семейство-зависимые операции (currentHead, broadcast) ходят в {@see EvmJsonRpc};
+ * URL живой ноды выбирается на лету через {@see RpcEndpointPicker} — это даёт
+ * автоматический failover на здоровый эндпоинт (GUIDE.md, Урок 12.4).
+ *
+ * Fee estimation реализована отдельно в модуле {@see \App\Modules\Fee} (Урок 9).
+ *
+ * @see \GUIDE.md  Урок 4 (#урок-4--l1-l2-и-семейства-сетей)
  */
 final readonly class EvmAdapter implements ChainAdapter, AddressValidator, FeeEstimator
 {

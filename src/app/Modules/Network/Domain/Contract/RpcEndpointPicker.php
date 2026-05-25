@@ -15,9 +15,9 @@ use App\Modules\Network\Domain\ValueObject\RpcKind;
  * Реализация по умолчанию (Network::Infrastructure\Picker\FirstHttpEndpointPicker)
  * возвращает первый endpoint подходящего kind в порядке регистрации chain'а.
  *
- * NodeHealth::Infrastructure\Picker\HealthBasedRpcEndpointPicker (Phase 7.1)
- * перебивает default через ServiceProvider — выбирает первый Healthy/Unknown
- * endpoint, пропуская Unhealthy.
+ * NodeHealth::Infrastructure\Picker\HealthBasedRpcEndpointPicker перебивает
+ * default через ServiceProvider — выбирает первый Healthy/Unknown endpoint,
+ * пропуская Unhealthy.
  *
  * Контракт намеренно НЕ принимает `EndpointStatus` или другие NodeHealth-VO —
  * Network не зависит от NodeHealth, picker остаётся black-box со стороны Domain.

@@ -6,7 +6,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Phase 7.3 — Global idempotency for POST requests
+    | Global idempotency for POST requests
     |--------------------------------------------------------------------------
     |
     | Triggered by `IdempotencyMiddleware` on the api group. A POST request

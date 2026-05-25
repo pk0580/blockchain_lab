@@ -75,7 +75,7 @@ Multi-sig 2-of-3 разделяет ключи между:
 
 ## Что в нашей платформе сейчас и что бы поменялось
 
-В нашей лабораторной (Phase 6) horyaчий кошелёк — это **single-key** аккаунт, зарезолвленный через `ConfigHotWalletResolver`. См. конкретные классы:
+В нашей лабораторной горячий кошелёк — это **single-key** аккаунт, зарезолвленный через `ConfigHotWalletResolver`. См. конкретные классы:
 
 - `app/Modules/Withdrawal/Application/UseCase/RequestWithdrawal/RequestWithdrawalAction.php` — оркестратор `Fee → Nonce → Build → Sign → Broadcast`.
 - `app/Modules/Withdrawal/Infrastructure/TxBuilder/BitcoinTxBuilder.php` / `EvmTxBuilder.php` — формируют unsigned-транзакцию.

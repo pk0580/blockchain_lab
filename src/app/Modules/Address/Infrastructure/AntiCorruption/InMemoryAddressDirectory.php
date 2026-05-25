@@ -8,9 +8,13 @@ use App\Modules\BlockIngestion\Domain\Contract\AddressDirectory;
 use App\Modules\Network\Domain\ValueObject\ChainFamily;
 
 /**
- * Test double for AddressDirectory. Used in unit / feature tests so we
- * don't need a live Redis instance. Bound in tests via $this->swap() or
- * directly through the container.
+ * Test double для {@see AddressDirectory} — массив в памяти.
+ *
+ * Тот же интерфейсный контракт, ноль внешних зависимостей — unit/feature тесты
+ * могут проверять логику сканера без живого Redis. Это типичная инфраструктурная
+ * инверсия: меняется только bind в Service Provider (GUIDE.md, Урок 5 — конец).
+ *
+ * @see \GUIDE.md  Урок 5 (#урок-5--сканирование-цепи-и-обнаружение-поступлений)
  */
 final class InMemoryAddressDirectory implements AddressDirectory
 {

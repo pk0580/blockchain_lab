@@ -29,7 +29,7 @@ return new class extends Migration
 
             $table->string('status', 20);
             $table->text('failure_reason')->nullable();
-            $table->uuid('replacement_of')->nullable();        // Phase 6.3 связь reverse-chain
+            $table->uuid('replacement_of')->nullable();        // Reverse-chain ссылка для RBF/resend
             $table->string('idempotency_key', 120);
             $table->unsignedInteger('version')->default(0);
 

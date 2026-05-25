@@ -9,9 +9,16 @@ use App\Modules\ReorgDetection\Application\UseCase\EvaluateBlockReorg\EvaluateBl
 use App\Modules\ReorgDetection\Application\UseCase\EvaluateBlockReorg\EvaluateBlockReorgData;
 
 /**
- * Мост: каждое сохранение нового блока запускает компаратор стораджа на
- * ReorgDetection. Слушает чужое доменное событие — это допустимая нагрузка
- * для Infrastructure-слоя (anti-corruption layer).
+ * Мост BlockIngestion → ReorgDetection: каждое сохранение нового блока
+ * запускает компаратор. Слушает чужое доменное событие — это допустимая
+ * нагрузка для Infrastructure-слоя (anti-corruption layer).
+ *
+ * Связь модулей описана в GUIDE.md, Урок 7 «Алгоритм обнаружения»: реакция
+ * на событие `BlockIngested` — это входная точка цепочки модулей ReorgDetection
+ * → Ledger::ReverseLedgerOnReorg / Webhook::RecordOutboxOnReorgDetected /
+ * Withdrawal::PauseChainOnReorgTooDeep.
+ *
+ * @see \GUIDE.md  Урок 7 (#урок-7--реорганизации-цепи)
  */
 final readonly class EvaluateOnBlockIngested
 {

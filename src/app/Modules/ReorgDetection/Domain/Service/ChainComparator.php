@@ -10,13 +10,24 @@ use App\Modules\ReorgDetection\Domain\ReadModel\StoredBlockSummary;
 use InvalidArgumentException;
 
 /**
- * Чистый сервис: получает новый блок и stored-предшественника (если есть),
- * возвращает решение — нет базовой точки, чистое продолжение, или reorg.
+ * Чистый сервис обнаружения реорга.
  *
- * При reorg `orphanedHeight = newBlock.height - 1` — тот блок старой цепи,
- * который нужно вытеснить. Walk back не делает: обработчик откатит cursor на
- * один шаг назад и попросит BlockIngestion ре-сканировать; следующий тик
- * либо завершится CleanExtension, либо снова даст Reorg на меньшей высоте.
+ * Алгоритм (GUIDE.md, Урок 7 «Алгоритм обнаружения»):
+ *
+ *   вход: новый блок (height H, parent_hash P) + stored prev (наш блок на H-1)
+ *
+ *   если storedPrev == null         → noBaseline
+ *   если storedPrev.hash == P       → cleanExtension (родитель совпал)
+ *   иначе                            → reorg(orphanedHeight = H-1)
+ *
+ * Идея: новый блок утверждает, что его родитель — P. У нас на той же высоте
+ * сохранён блок с другим хешем. Значит, наш блок — orphan, его надо вытеснить.
+ *
+ * ⚠️ Walk-back не делает: Action отступит ровно на один блок, и следующий тик
+ * сканера снова дёрнет компаратор. Так итеративно ищется общий предок
+ * (GUIDE.md, Урок 7 — последний абзац «Что делает Action»).
+ *
+ * @see \GUIDE.md  Урок 7 (#урок-7--реорганизации-цепи)
  */
 final class ChainComparator
 {

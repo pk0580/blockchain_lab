@@ -17,7 +17,7 @@ use Illuminate\Http\Response;
  * POST /api/v1/withdrawals
  *
  *  - 202 Accepted при новом запросе (withdrawal либо уже Broadcasted, либо
- *    Failed — клиент тянет статус повторным GET в Phase 6.3).
+ *    Failed — клиент тянет статус повторным GET).
  *  - 200 OK при идемпотентном replay с тем же body.
  *  - 409 Conflict если Idempotency-Key переиспользован с другим payload.
  *  - 502 Bad Gateway если broadcast (или upstream) сорвался — withdrawal

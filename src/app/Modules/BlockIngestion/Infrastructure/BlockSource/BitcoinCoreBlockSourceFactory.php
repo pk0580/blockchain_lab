@@ -13,9 +13,9 @@ use Illuminate\Http\Client\Factory as HttpFactory;
 use RuntimeException;
 
 /**
- * Resolves the right block source per chain family. Phase 4 only ships the
- * Bitcoin implementation — other families throw, which is louder than silently
- * scanning nothing.
+ * Resolves the right block source per chain family. Only the Bitcoin
+ * implementation is shipped — other families throw, which is louder than
+ * silently scanning nothing.
  */
 final readonly class BitcoinCoreBlockSourceFactory implements BlockSourceFactory
 {
@@ -34,7 +34,7 @@ final readonly class BitcoinCoreBlockSourceFactory implements BlockSourceFactory
         if ($chain->family !== ChainFamily::Bitcoin) {
             throw new RuntimeException(
                 "BitcoinCoreBlockSourceFactory cannot build a source for family "
-                ."'{$chain->family->value}'; Phase 4 only supports bitcoin."
+                ."'{$chain->family->value}'; only bitcoin is supported."
             );
         }
 

@@ -7,17 +7,24 @@ namespace App\Modules\Webhook\Domain\ValueObject;
 use InvalidArgumentException;
 
 /**
- * HMAC-SHA256 подпись (Stripe-style):
- *   sig = hash_hmac('sha256', $timestamp . '.' . $body, $secret)
+ * HMAC-SHA256 подпись webhook'ов (Stripe-style) — GUIDE.md, Урок 12.3.
  *
- * Headers:
+ * Алгоритм:
+ *   sig = sha256=<hex(hmac_sha256(secret, timestamp + "." + body))>
+ *
+ * Headers, которые мы отправляем клиенту:
  *   X-Timestamp: <epoch seconds>
- *   X-Signature: sha256=<hex digest>
+ *   X-Signature: sha256=<hex>
  *
- * Получатель повторяет вычисление, проверяет equality + timestamp ≤ 5 минут.
+ * Клиент повторяет вычисление с тем же `secret` (выданным нами при подписке),
+ * сравнивает через {@see hash_equals()} (timing-safe), и проверяет, что
+ * `now − timestamp ≤ 5 минут` — защита от replay (перехват и переотправка
+ * через час).
  *
- * Формирование подписи делается через `WebhookSignature::compute()`; верификация —
- * через `WebhookSignature::verify()`. Используется `hash_equals` для timing-safe сравнения.
+ * ⚠️ Использовать только `hash_equals` для сравнения подписей, никогда не `===`.
+ * Иначе timing-атака может постепенно угадать байты подписи.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class WebhookSignature
 {

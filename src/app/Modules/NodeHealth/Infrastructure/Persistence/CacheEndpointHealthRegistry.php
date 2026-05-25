@@ -13,15 +13,18 @@ use DateTimeImmutable;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 
 /**
- * Cache-backed реализация registry. Phase 7.1 хранит:
- *   - `node_health:{chain_id}:{sha256(url)}` → массив с last observation;
- *   - `node_health:index:{chain_id}` → массив известных URL для chain'а (нужно
- *     для `knownEndpointsFor()` — pick может не знать какие endpoint'ы есть
- *     на cold-start, поэтому index пишется на каждом `record()`).
+ * Cache-backed registry состояний эндпоинтов (GUIDE.md, Урок 12.4).
  *
- * TTL ставим 1 час: probe job обновляет каждые 30 сек, протухание окно — ok.
- * Если probe job встанет — записи протухнут, picker уйдёт на fallback (Unknown
- * trumps nothing-known).
+ * Хранение в Laravel Cache (Redis в проде):
+ *   - `node_health:{chain_id}:{sha256(url)}` → массив с last observation;
+ *   - `node_health:index:{chain_id}` → список известных URL для chain'а
+ *     (пишется на каждом `record()`, нужен для cold-start picker'а).
+ *
+ * TTL = 1 час: probe-job обновляет каждые ~30 сек, окно протухания комфортное.
+ * Если probe-job встанет — записи протухнут, picker увидит Unknown и всё равно
+ * сможет выбрать эндпоинт (Unknown isUsable; см. GUIDE §12.4).
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class CacheEndpointHealthRegistry implements EndpointHealthRegistry
 {

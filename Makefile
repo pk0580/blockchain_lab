@@ -122,7 +122,7 @@ queue: ## Run queue worker (foreground; Horizon handles prod queues)
 	$(EXEC) php artisan queue:listen --tries=3
 
 # ----------------------------------------------------------------------------
-# Frontend (Phase 8.1) — Inertia + Vue + Vite через node service
+# Frontend — Inertia + Vue + Vite через node service
 # ----------------------------------------------------------------------------
 NODE_SERVICE     ?= node
 NODE_CONTAINER   ?= blockchain-lab-node-1

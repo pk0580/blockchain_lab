@@ -21,15 +21,26 @@ use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
- * Глобальный middleware на любой POST-запрос с заголовком `Idempotency-Key`.
+ * Глобальный HTTP-middleware идемпотентности (GUIDE.md, Урок 12.1).
  *
- *  - Без заголовка — pass-through.
- *  - Невалидный ключ (длина / charset) — 400 `idempotency_key_invalid`.
- *  - Lookup замороженного response'а: тот же hash → replay; другой → 409.
- *  - $next($request) и запись 2xx-4xx (не 5xx — transient'ы не кешируем).
+ * Алгоритм:
+ *  1. Если метод не POST или нет заголовка `Idempotency-Key` — pass-through.
+ *  2. Невалидный ключ (длина / charset) → 400 `idempotency_key_invalid`.
+ *  3. request_hash = sha256(method + "\n" + path + "\n" + body).
+ *  4. Lookup по key:
+ *     - есть и тот же hash → replay оригинального ответа
+ *       + заголовок `X-Idempotent-Replay: true` (клиент отличит cached);
+ *     - есть и другой hash → 409 `idempotency_conflict`
+ *       (тот же ключ, другой запрос — ошибка клиента);
+ *     - нет → выполнить запрос.
+ *  5. После выполнения: сохранить 2xx-4xx ответ с TTL 24 часа.
  *
- * Replay сохраняет оригинальный status + body и добавляет заголовок
- * `X-Idempotent-Replay: true`, чтобы клиент мог отличить cached от свежего.
+ * ⚠️ 5xx НЕ кешируем (GUIDE §12.1, конец): транзиентные ошибки. Если закешировать,
+ * клиент получит «вечный 500» на ретрай — это хуже, чем без кеша.
+ *
+ * ⚠️ Replay возвращает ОРИГИНАЛЬНЫЙ status (201/422/...), а не 200.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class IdempotencyMiddleware
 {

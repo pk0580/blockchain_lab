@@ -14,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Phase 7.3 — раз в сутки чистит просроченные idempotency-ключи.
+ * Раз в сутки чистит просроченные idempotency-ключи.
  * Шумные ошибки логируются, но не пробрасываются — job не должен застревать
  * в retry-loop из-за временной недоступности БД.
  */

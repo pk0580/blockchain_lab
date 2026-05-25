@@ -7,7 +7,7 @@ namespace App\Modules\Address\Domain\ValueObject;
 use InvalidArgumentException;
 
 /**
- * Forward declaration for the Wallet bounded context (Phase 5). Address
+ * Forward declaration for the (not yet built) Wallet bounded context. Address
  * holds a WalletId reference but does not reach into Wallet — the actual
  * Wallet entity is foreign to this module.
  */

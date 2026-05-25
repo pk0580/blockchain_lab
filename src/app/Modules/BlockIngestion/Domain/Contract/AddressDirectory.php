@@ -7,11 +7,20 @@ namespace App\Modules\BlockIngestion\Domain\Contract;
 use App\Modules\Network\Domain\ValueObject\ChainFamily;
 
 /**
- * Порт стороны чтения (Read-side): "является ли этот адрес нашим?". Дает быстрый ответ
- * для каждого потенциального выхода в просканированном блоке. В Фазе 4 это реализуется
- * через Redis SET для каждого семейства (SADD / SISMEMBER), который наполняется модулем
- * Address через слушателя события `AddressGenerated`. BlockIngestion никогда не импортирует
- * модуль Address — он взаимодействует только с этим контрактом.
+ * Read-side порт «является ли этот адрес нашим?». Должен отвечать в микросекундах:
+ * сканер делает десятки тысяч таких проверок на каждый блок (см. GUIDE.md, Урок 5
+ * — раздел «Почему Redis, а не PostgreSQL»).
+ *
+ * Источник правды для адресов — таблица `addresses` (Address::Infrastructure).
+ * Этот порт — денормализованная проекция под одну операцию SISMEMBER.
+ *
+ * Реализации:
+ *  - {@see \App\Modules\Address\Infrastructure\AntiCorruption\RedisAddressDirectory} — prod.
+ *  - {@see \App\Modules\Address\Infrastructure\AntiCorruption\InMemoryAddressDirectory} — тесты.
+ *
+ * BlockIngestion никогда не импортирует модуль Address напрямую — только этот порт.
+ *
+ * @see \GUIDE.md  Урок 5 (#урок-5--сканирование-цепи-и-обнаружение-поступлений)
  */
 interface AddressDirectory
 {

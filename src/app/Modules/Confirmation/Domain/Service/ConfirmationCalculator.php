@@ -8,14 +8,17 @@ use App\Modules\Confirmation\Domain\ValueObject\ConfirmationOutcome;
 use InvalidArgumentException;
 
 /**
- * Чистая функция. По высоте последнего просканированного блока и высоте
- * блока tx возвращает текущее число подтверждений и его жизненный outcome
- * для сети с порогом `$requiredConfirmations` и пределом реорга `$maxReorgDepth`.
+ * Чистая функция вычисления подтверждений — без побочных эффектов, легко тестируется.
  *
- *   confirmations = max(0, lastScannedHeight - txHeight + 1)
- *   outcome       = finalized  если confirmations > maxReorgDepth
- *                   confirmed  если confirmations >= requiredConfirmations
- *                   confirming иначе (>= 1, т.к. tx в просканированном блоке)
+ * Формула (GUIDE.md, Урок 6 «Что значит "подтверждение"»):
+ *
+ *   confirmations = max(0, lastScannedHeight - txBlockHeight + 1)
+ *
+ *   outcome = Finalized  если confirmations > maxReorgDepth
+ *           = Confirmed  если confirmations >= requiredConfirmations
+ *           = Confirming иначе (>= 1, т.к. tx в просканированном блоке)
+ *
+ * @see \GUIDE.md  Урок 6 (#урок-6--подтверждения-и-финализация)
  */
 final class ConfirmationCalculator
 {

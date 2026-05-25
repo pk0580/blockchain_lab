@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Ledger\Domain\ValueObject;
 
 /**
- * Перечисление типов операций. Phase 5 использует Deposit и ReorgReversal;
- * Withdrawal/Fee добавятся в Phase 6 без миграции схемы (колонка string).
+ * Перечисление типов операций. Сейчас активно используются Deposit и
+ * ReorgReversal; Withdrawal/Fee зарезервированы (колонка string, миграции
+ * схемы не понадобится).
  */
 enum OperationType: string
 {

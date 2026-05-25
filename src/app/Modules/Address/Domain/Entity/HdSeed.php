@@ -16,6 +16,13 @@ use DateTimeImmutable;
  * ВАЖНО: эта сущность НЕ содержит материала ключей. Мнемоника / мастер-ключ
  * находятся исключительно внутри Go-сервиса подписи; мы храним непрозрачную
  * {@see HdSeedReference}, которую сервис подписи использует для их поиска.
+ *
+ * Принцип «PHP не видит приватных ключей» и роль `signing-svc` подробно
+ * объяснены в GUIDE.md, Урок 2 — раздел «Почему ключи живут в отдельном
+ * сервисе» и «Ссылка на ключ». Аналогия: запись в этой таблице — карточка
+ * в блокноте про мешок с ключами; сам мешок лежит в сейфе signing-svc.
+ *
+ * @see \GUIDE.md  Урок 2 (#урок-2--ключи-адреса-и-hd-кошельки)
  */
 final class HdSeed
 {
@@ -25,7 +32,7 @@ final class HdSeed
     private function __construct(
         public readonly HdSeedId $id,
         public readonly HdSeedReference $reference,
-        public readonly ?ChainFamily $family,         // null = несколько семейств (Фаза 9+)
+        public readonly ?ChainFamily $family,         // null = универсальный сид для нескольких семейств
         public readonly DateTimeImmutable $createdAt,
     ) {}
 

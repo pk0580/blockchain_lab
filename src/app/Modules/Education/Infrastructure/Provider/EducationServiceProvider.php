@@ -79,7 +79,7 @@ final class EducationServiceProvider extends ServiceProvider
             );
         });
 
-        // Phase 8.4 — 5 read-провайдеров для admin dashboard'а. Singleton ок:
+        // 5 read-провайдеров для admin dashboard'а. Singleton ок:
         // ни один из них не держит state'а между запросами.
         $this->app->singleton(NodeHealthOverviewProvider::class, RegistryNodeHealthOverviewProvider::class);
         $this->app->singleton(MempoolOverviewProvider::class, RegtestMempoolOverviewProvider::class);

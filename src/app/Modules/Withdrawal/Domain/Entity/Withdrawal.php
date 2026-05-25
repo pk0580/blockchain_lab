@@ -28,14 +28,26 @@ use App\Modules\Withdrawal\Domain\ValueObject\WithdrawalStatus;
 use DateTimeImmutable;
 
 /**
- * Withdrawal aggregate. Все мутирующие методы — целевые операции (markAsBuilt,
- * markAsSigned, markAsBroadcasted, markAsConfirming/Confirmed/Stuck/Replaced, fail),
- * а не сеттеры. Каждый шаг продвигает статус через
- * {@see WithdrawalStatus::assertCanTransitionTo()} и поднимает domain event,
- * который Application::Action пуляет через диспатчер.
+ * Withdrawal — aggregate root для одной исходящей транзакции.
  *
- * Domain-сторона осознанно ничего не знает про PG / Eloquent / HTTP — здесь
- * только бизнес-инварианты state machine.
+ * Шаги жизненного цикла (GUIDE.md, Урок 10 «State machine»):
+ *
+ *   - request()          — фабрика, статус Requested.
+ *   - markAsBuilt()      — собрали черновик транзакции (rawHex, nonce, signingExtras).
+ *   - markAsSigned()     — подпись от signing-svc получена.
+ *   - markAsBroadcasted() — отправили в mempool сети, получили txHash.
+ *   - markAsConfirming/Confirmed() — обновление от polling-задачи (Урок 6).
+ *   - markAsStuck()      — слишком долго висит без подтверждения (Урок 11).
+ *   - markAsReplaced()   — заменён через RBF/resend (Урок 11).
+ *   - fail()             — терминальный сбой.
+ *
+ * Все мутирующие методы — целевые операции (markAs…), не сеттеры. Каждый шаг
+ * продвигает статус через {@see WithdrawalStatus::assertCanTransitionTo()} и
+ * поднимает domain event, который Application::Action диспатчит.
+ *
+ * Domain-сторона осознанно ничего не знает про PG / Eloquent / HTTP.
+ *
+ * @see \GUIDE.md  Урок 10 (#урок-10--вывод-средств-withdrawal)
  */
 final class Withdrawal
 {
@@ -202,7 +214,7 @@ final class Withdrawal
     }
 
     /**
-     * Фаза 6.3: фоновая задача (polling job) фиксирует промежуточные подтверждения. Метод
+     * Фоновая задача (polling job) фиксирует промежуточные подтверждения. Метод
      * идемпотентен — при том же значении $confirmations события не создаются,
      * в этом случае ничего не делаем.
      */

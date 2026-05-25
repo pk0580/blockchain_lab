@@ -7,8 +7,8 @@ namespace App\Modules\Webhook\Domain\ValueObject;
 use InvalidArgumentException;
 
 /**
- * Symmetric secret для HMAC-SHA256 подписи. Хранится в БД plaintext — Phase 9
- * добавит envelope encryption через Laravel Encrypter.
+ * Symmetric secret для HMAC-SHA256 подписи. Сейчас хранится в БД plaintext;
+ * envelope encryption через Laravel Encrypter — потенциальное усиление.
  *
  * Длина 32..128 chars; короче нет смысла (256 bits == 32 bytes hex = 64 chars
  * recommended). НЕ хранится в логах: метод `__toString()` намеренно отсутствует.

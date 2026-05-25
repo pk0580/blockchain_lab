@@ -11,10 +11,10 @@ use App\Modules\Fee\Domain\ValueObject\FeeQuote;
 use App\Modules\Network\Domain\Entity\Chain;
 
 /**
- * Заглушка для семейств без реализации (Tron в Phase 6). Сознательно
+ * Заглушка для семейств без реализации (например, Tron). Сознательно
  * бросает исключение, а не возвращает фейк: ни одна tx не должна дойти до
- * подписи, опираясь на липовый fee. Phase 6.5 заменит на TronFeeEstimator
- * (bandwidth/energy).
+ * подписи, опираясь на липовый fee. Будущий TronFeeEstimator (bandwidth/energy)
+ * заменит эту заглушку.
  */
 final readonly class StubFeeEstimator implements FeeEstimator
 {

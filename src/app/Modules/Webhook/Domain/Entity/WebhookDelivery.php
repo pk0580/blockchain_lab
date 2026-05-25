@@ -23,9 +23,9 @@ use InvalidArgumentException;
  *           → Failed    (конечное)
  *           → Pending   (повтор — attempt++, scheduledAt сдвигается)
  *
- * Pending → Pending — это перепланирование (re-schedule) с задержкой (backoff); история повторов хранится в
- * `attempts` + `lastError`, отдельной таблицы для попыток в 7.2 не вводим
- * (Фаза 9 добавит журнал аудита для каждой попытки).
+ * Pending → Pending — это перепланирование (re-schedule) с задержкой (backoff);
+ * история повторов хранится в `attempts` + `lastError`, отдельной таблицы для
+ * каждой попытки нет (можно добавить позже как журнал аудита).
  */
 final class WebhookDelivery
 {

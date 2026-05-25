@@ -64,7 +64,7 @@ Master key оборачивается «один к многим» — он ре
 
 ## Что в нашей платформе сейчас и куда мы движемся
 
-Сейчас (Phase 2, см. ADR `docs/architecture/decisions/0004-go-signing-service.md`):
+Сейчас (см. ADR `docs/architecture/decisions/0004-go-signing-service.md`):
 
 - **Изолированный Go-сервис** `signing-svc/` — единственное место, где находятся приватные ключи. PHP-сервис не имеет к ним доступа никогда.
 - **Файл-на-диске** (или env-переменная — `SIGNING_SVC_BEARER_TOKEN`, плюс ключи лежат в encrypted volume контейнера). Это **HSM-эквивалент уровня "ничего"** — защита только от случайных просмотров логов и git'а.
@@ -74,7 +74,7 @@ Master key оборачивается «один к многим» — он ре
 - `signing-svc/internal/server/handlers.go` — endpoint'ы `/v1/tx/sign`, `/v1/addresses/derive`. Они работают через `internal/keys/` (где сейчас seed читается из файла).
 - `app/Modules/Network/Domain/Contract/SigningClient.php` + `app/Modules/Network/Infrastructure/Signer/HttpSigningClient.php` — PHP-клиент к сервису.
 
-В Phase 9 (production hardening) сюда добавятся:
+При переходе в production hardening сюда добавятся:
 
 1. **KMS-адаптер** в `signing-svc/internal/keys/kms_*.go` — реализация `KeyProvider` интерфейса с двумя бэкендами:
    - dev: **SoftHSM** через PKCS#11 (https://www.opendnssec.org/softhsm/) — позволяет писать код для HSM без купленного железа.

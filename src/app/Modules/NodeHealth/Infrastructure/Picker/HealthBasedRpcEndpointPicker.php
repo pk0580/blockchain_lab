@@ -14,12 +14,20 @@ use App\Modules\NodeHealth\Domain\ValueObject\EndpointKey;
 use App\Modules\NodeHealth\Domain\ValueObject\EndpointStatus;
 
 /**
- * Picker, который перебирает endpoint'ы chain'а и возвращает первый usable
- * (Healthy → Degraded → Unknown — в этом приоритете). Endpoint'ы со статусом
- * `Unhealthy` пропускаются.
+ * Health-based RPC endpoint picker (GUIDE.md, Урок 12.4).
  *
- * Если все endpoint'ы оказались Unhealthy — бросаем `NoRpcEndpointException`,
- * чтобы caller получил 503 (а не выбор «лучший из плохих»).
+ * Алгоритм:
+ *   кандидаты = endpoints, у которых status.isUsable() (т.е. НЕ Unhealthy)
+ *   сортировка: Healthy → Degraded → Unknown
+ *   вернуть первый; если кандидатов нет — NoRpcEndpointException → 503
+ *
+ * Эффективно работает как circuit-breaker: упавший эндпоинт автоматически
+ * исключается из выбора, пока probe не увидит, что он снова жив.
+ *
+ * ⚠️ Если все эндпоинты Unhealthy — кидаем исключение, НЕ выбираем «лучший
+ * из плохих». 503 предпочтительнее заведомо плохого ответа.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class HealthBasedRpcEndpointPicker implements RpcEndpointPicker
 {

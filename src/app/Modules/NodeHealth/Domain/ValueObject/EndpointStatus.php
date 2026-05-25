@@ -15,7 +15,8 @@ namespace App\Modules\NodeHealth\Domain\ValueObject;
  *  - `Unhealthy` — последний probe упал. Picker полностью пропускает.
  *
  * Логика «через сколько неудач переходим в Unhealthy» — в `EndpointHealthRegistry`.
- * Phase 7.1 переключает по single observation; Phase 9+ добавит N-of-M плавающее окно.
+ * Текущая реализация переключает по single observation; N-of-M скользящее окно
+ * пока не реализовано.
  */
 enum EndpointStatus: string
 {

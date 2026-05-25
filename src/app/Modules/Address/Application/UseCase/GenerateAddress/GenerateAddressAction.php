@@ -21,6 +21,18 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Str;
 
+/**
+ * Выводит новый адрес из HD-сида и записывает его в БД.
+ *
+ * Полный алгоритм — GUIDE.md, Урок 2, раздел «Создание адреса».
+ *
+ * ⚠️ Шаг с advisory-lock критичен: без сериализации выделения индекса два
+ * параллельных запроса могли бы получить одинаковый индекс → одинаковый
+ * адрес → нарушение уникальности. Тот же приём в [[EloquentNonceAllocator]]
+ * для EVM-nonce (GUIDE.md, Урок 10).
+ *
+ * @see \GUIDE.md  Урок 2 (#урок-2--ключи-адреса-и-hd-кошельки)
+ */
 final readonly class GenerateAddressAction
 {
     public function __construct(
@@ -38,6 +50,7 @@ final readonly class GenerateAddressAction
         $family = ChainFamily::fromString($data->family);
         $walletId = $data->walletId !== null ? new WalletId($data->walletId) : null;
 
+        // Шаг 1 (GUIDE §2): загрузить сид. Если у сида прибито family — проверить совпадение.
         $seed = $this->seeds->findById($seedId)
             ?? throw HdSeedNotFoundException::byId($seedId);
 
@@ -48,13 +61,18 @@ final readonly class GenerateAddressAction
         }
 
         // Выделение индекса + вызов signing-svc + вставка в БД в одной транзакции.
-        // Метод nextDerivationIndex репозитория устанавливает рекомендательную блокировку (advisory lock),
-        // чтобы два одновременных запроса для одного и того же (seed, family) не могли
-        // получить один и тот же индекс.
+        // Метод nextDerivationIndex репозитория ставит advisory-lock на пару (seed, family) —
+        // см. GUIDE.md, Урок 2: без этого два параллельных запроса получили бы одинаковый
+        // индекс. Тот же подход применён для nonce — см. GUIDE.md, Урок 10.
         return $this->db->transaction(function () use ($seed, $seedId, $family, $walletId): AddressDescriptor {
+            // Шаг 2 (GUIDE §2): выделить следующий индекс под advisory-lock.
             $index = $this->addresses->nextDerivationIndex($seedId, $family);
+
+            // Шаг 3 (GUIDE §2): собрать путь BIP-44 для семейства.
             $path = $this->paths->buildExternal($family, $index);
 
+            // Шаг 4 (GUIDE §2): попросить signing-svc вывести адрес.
+            // Приватный ключ остаётся внутри signing-svc; нам приходит только публичный адрес.
             $derived = $this->signing->deriveAddress(
                 seedReference: (string) $seed->reference,
                 family: $family,
@@ -71,6 +89,10 @@ final readonly class GenerateAddressAction
                 now: new DateTimeImmutable(),
             );
 
+            // Шаг 5 (GUIDE §2): сохранить запись + поднять событие AddressGenerated после COMMIT.
+            // На это событие реагирует [[RegisterAddressInDirectory]] — добавляет адрес
+            // в Redis-набор, чтобы сканер мог в O(1) проверить «наш ли этот выход?»
+            // (см. GUIDE.md, Урок 5, раздел «Почему Redis, а не PostgreSQL»).
             $this->addresses->save($address);
 
             $events = $address->pullPendingEvents();

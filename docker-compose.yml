@@ -147,7 +147,7 @@ services:
       retries: 5
     networks: [lab]
 
-  # Phase 8.1 — Frontend (Inertia + Vue) build container.
+  # Frontend (Inertia + Vue) build container.
   # Запускается через `make assets-dev` (HMR) или `make assets-build` (prod).
   # Дефолтный command — `dev`, так что `docker compose up -d node` сразу даёт
   # HMR на 5173. Volume общий с app:/var/www/html, потому что Laravel-Vite

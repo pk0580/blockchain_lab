@@ -9,9 +9,16 @@ use App\Modules\Webhook\Application\UseCase\RecordOutboxMessage\RecordOutboxMess
 use App\Modules\Withdrawal\Domain\Event\WithdrawalConfirmed;
 
 /**
- * Cross-module Infrastructure listener: подписан на чужой Domain event без
- * нарушения boundaries (Infrastructure → чужой Domain — разрешено;
- * Application → чужой Domain — НЕ разрешено).
+ * Withdrawal::WithdrawalConfirmed → Webhook outbox (`withdrawal.confirmed`).
+ *
+ * Подписанные клиенты получают уведомление, что исходящий платёж достиг
+ * requiredConfirmations. Доставка через transactional outbox (at-least-once,
+ * GUIDE.md, Урок 12.2).
+ *
+ * Cross-module Infrastructure listener: подписка на чужой Domain event
+ * разрешена только в Infrastructure (Application → чужой Domain — нельзя).
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class RecordOutboxOnWithdrawalConfirmed
 {

@@ -7,10 +7,22 @@ namespace App\Modules\Ledger\Domain\ValueObject;
 use InvalidArgumentException;
 
 /**
- * Сумма в minor units сети (wei/satoshi/sun) + валюта. Хранится строкой,
- * потому что значения могут не помещаться в int64 (NUMERIC(40,0) в БД).
- * Никаких арифметических операций над Money здесь нет — Phase 5 ledger
- * не нуждается в сложении балансов; этим займётся Wallet read-model.
+ * Сумма в minor units сети + валюта.
+ *
+ * Единицы (GUIDE.md, Урок 3, врезка «Единицы измерения»):
+ *   1 BTC  = 10^8  сатоши (sat)
+ *   1 ETH  = 10^18 wei
+ *   1 TRX  = 10^6  sun
+ *
+ * ⚠️ Хранится СТРОКОЙ, потому что значения в wei могут быть до 40 десятичных
+ * цифр — int64 (макс. ~19 цифр) не хватит. БД: `NUMERIC(40,0)`. См. GUIDE.md,
+ * Урок 8 «Сущность LedgerEntry», конец раздела.
+ *
+ * Арифметики над Money здесь нет — Ledger не считает балансы; этим занимается
+ * Wallet read-model. Это намеренно: Money — value object, а не number.
+ *
+ * @see \GUIDE.md  Урок 3 (#урок-3--транзакция-utxo-против-аккаунта)
+ * @see \GUIDE.md  Урок 8 (#урок-8--двойная-бухгалтерия-ledger)
  */
 final readonly class Money
 {

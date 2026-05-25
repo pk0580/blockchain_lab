@@ -12,11 +12,10 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 
 /**
- * Подписка интегратора: «куда + чем подписывать + на какие события». Phase 7.2
- * наполняется только из `config('webhook.subscriptions')` — Phase 8 добавит
- * admin UI + миграцию CRUD endpoint'ов. Поэтому у нас нет конструкторов
- * `enable()` / `disable()` или mutator-методов; subscription иммутабельна
- * с момента создания.
+ * Подписка интегратора: «куда + чем подписывать + на какие события». Сейчас
+ * наполняется только из `config('webhook.subscriptions')`; admin UI + CRUD
+ * endpoint'ы пока не реализованы. Поэтому у нас нет конструкторов `enable()` /
+ * `disable()` или mutator-методов; subscription иммутабельна с момента создания.
  */
 final readonly class WebhookSubscription
 {

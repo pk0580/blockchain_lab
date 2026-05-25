@@ -15,8 +15,15 @@ use DateTimeImmutable;
 use Throwable;
 
 /**
- * EVM probe: `eth_blockNumber`. Тот же подход что в Bitcoin'е: измеряем RTT,
- * любая ошибка → Unhealthy, slow → Degraded.
+ * EVM health probe (GUIDE.md, Урок 12.4): `eth_blockNumber`.
+ *
+ * Логика:
+ *   - меряем RTT;
+ *   - любая ошибка (RPC/transport/прочее) → {@see EndpointObservation::unhealthy()};
+ *   - latency ≥ 2000 ms → {@see EndpointObservation::degraded()};
+ *   - иначе → {@see EndpointObservation::healthy()}.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class EvmEndpointHealthProbe implements EndpointHealthProbe
 {

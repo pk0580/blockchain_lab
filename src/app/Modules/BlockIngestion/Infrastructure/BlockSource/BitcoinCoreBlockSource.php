@@ -18,13 +18,23 @@ use App\Modules\Network\Domain\ValueObject\TxHash;
 use DateTimeImmutable;
 
 /**
- * Источник блоков Bitcoin Core, работающий по принципу опроса. Bitcoin RPC возвращает суммы в BTC как
- * числа с плавающей точкой (floats) — мы конвертируем их в сатоши как строковые представления целых чисел
- * через bcmul, никогда не доверяя точности float.
+ * Источник блоков Bitcoin Core, работающий по принципу опроса (poll-based).
  *
- * Выходы (outputs) сводятся к паре (адрес, сумма). Скрипты Bitcoin, которые создают
- * несколько адресов (редко; в основном устаревшие 1-из-1) или не создают адресов (OP_RETURN,
- * мультиподпись без разрешения адреса на данном узле), пропускаются.
+ * Реализует пайплайн «прочитать блок → достать outputs → сматчить адрес»,
+ * описанный в GUIDE.md, Урок 3 («UTXO-модель») и Урок 5 («Сканирование цепи»).
+ *
+ * ⚠️ Bitcoin RPC возвращает суммы в BTC как float (например, "0.50000000").
+ * Мы конвертируем их в сатоши (целые числа как строки) через bcmul и
+ * НИКОГДА не доверяем точности float — иначе на больших суммах поедут
+ * последние знаки. Концепция «BTC = 10^8 сатоши» подробно — GUIDE.md, Урок 3.
+ *
+ * Выходы (outputs) сводятся к паре (адрес, сумма). Скрипты Bitcoin, которые
+ * создают несколько адресов (редко; в основном устаревшие 1-из-1) или не
+ * создают адресов (OP_RETURN, мультиподпись без разрешения адреса на данном
+ * узле), пропускаются.
+ *
+ * @see \GUIDE.md  Урок 3 (#урок-3--транзакция-utxo-против-аккаунта)
+ * @see \GUIDE.md  Урок 5 (#урок-5--сканирование-цепи-и-обнаружение-поступлений)
  */
 final readonly class BitcoinCoreBlockSource implements BlockSource
 {
@@ -38,6 +48,11 @@ final readonly class BitcoinCoreBlockSource implements BlockSource
         return new BlockHeight($this->rpc->getBlockCount());
     }
 
+    /**
+     * Один такт сканирования: getblockhash(N) + getblock(hash, verbosity=2).
+     * verbosity=2 включает развёрнутый список транзакций с vout-адресами —
+     * без него пришлось бы делать N+1 запросов.
+     */
     public function fetchBlockAt(BlockHeight $height): FetchedBlock
     {
         $hash = $this->rpc->getBlockHash($height->value);
@@ -52,7 +67,7 @@ final readonly class BitcoinCoreBlockSource implements BlockSource
         if ($parentHashRaw === '') {
             throw BlockSourceException::protocol(
                 "Block at height {$height->value} has no previousblockhash; "
-                .'Phase 4 does not ingest genesis.'
+                .'scanner does not ingest the genesis block.'
             );
         }
 

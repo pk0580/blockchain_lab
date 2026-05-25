@@ -20,21 +20,34 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Сборщик BTC транзакций (Greedy-largest-first). MVP Фазы 6.2:
+ * Сборщик BTC-транзакций по стратегии «Greedy-largest-first».
  *
- *  1. `listunspent 1 9999 [hot_address]` → доступные UTXO.
- *  2. Сортируем по сумме (amount) по убыванию, выбираем необходимое количество,
- *     считаем сдачу = sum_in - amount - fee.
- *  3. `createrawtransaction` ⇒ unsigned hex.
- *  4. Передаем в signing-svc вместе с информацией о входах (prev-outs) для подписи.
+ * Алгоритм (GUIDE.md, Урок 3 «UTXO-модель», раздел «В коде»):
  *
- * Комиссия оценивается как `satPerVbyte * estimated_vsize`. estimated_vsize
- * считается по эвристике: 110 байт на вход + 34 на выход + 10 на заголовок —
- * этого достаточно для regtest p2wpkh. Для серьезных сумм в mainnet
- * используется PSBT с estimatesmartfee + точный sign-test, что появится позже.
+ *  1. `listunspent 1 9999 [hot_address]` → список доступных UTXO горячего кошелька.
+ *  2. Сортируем UTXO по сумме (amount) по убыванию, набираем сверху, пока
+ *     `Σinputs ≥ amount + fee`.
+ *  3. Сдача = `Σinputs − amount − fee`. Если меньше dust threshold
+ *     (546 сатоши) — «съедается» комиссией.
+ *  4. `createrawtransaction` ⇒ unsigned hex.
+ *  5. Передаём в signing-svc вместе с prev-outs (нужны подписанту для P2WPKH SIGHASH).
  *
- * BitcoinRpcClient берется для каждой сети через factory, чтобы поддерживать
+ * Комиссия = `satPerVbyte * estimated_vsize`. estimated_vsize считается по
+ * эвристике: 110 байт на вход + 34 на выход + 10 на заголовок — этого
+ * достаточно для regtest p2wpkh. Подробнее про sat/vbyte — GUIDE.md, Урок 9.
+ *
+ * Метод {@see rebuild()} реализует BIP-125 RBF — см. GUIDE.md, Урок 11.
+ *
+ * ⚠️ Все суммы — целые числа в сатоши (см. GUIDE §3, врезка про единицы).
+ * Конвертация sat ↔ BTC идёт через bcmath, потому что float-арифметика
+ * на 8 знаков после точки уже теряет точность для больших сумм.
+ *
+ * BitcoinRpcClient берётся для каждой сети через factory, чтобы поддерживать
  * несколько BTC-сетей (regtest/testnet/...) без перерегистрации.
+ *
+ * @see \GUIDE.md  Урок 3 (#урок-3--транзакция-utxo-против-аккаунта)
+ * @see \GUIDE.md  Урок 9 (#урок-9--комиссия-fee)
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 final readonly class BitcoinTxBuilder implements TxBuilder
 {
@@ -43,7 +56,10 @@ final readonly class BitcoinTxBuilder implements TxBuilder
     private const ESTIMATED_OVERHEAD_VBYTES = 10;
     private const SATOSHIS_PER_BTC = 100_000_000;
 
-    /** BIP-125 «replace-by-fee»: sequence < 0xfffffffe = "replaceable". */
+    /**
+     * BIP-125 «opt-in replace-by-fee»: sequence < 0xfffffffe = «replaceable».
+     * См. GUIDE.md, Урок 11 — раздел «BIP-125 в Bitcoin: подробнее».
+     */
     private const RBF_SEQUENCE = 0xfffffffd;
 
     public function __construct(
@@ -73,6 +89,8 @@ final readonly class BitcoinTxBuilder implements TxBuilder
 
         $rpc = ($this->rpcFactory)($chain);
 
+        // Шаг 1 (GUIDE §3): запрашиваем все UTXO горячего адреса с минимум 1 confirmation.
+        // 9999 — верхняя граница confirmations (Bitcoin Core API не имеет «inf»).
         try {
             /** @var list<array<string, mixed>> $utxos */
             $utxos = (array) $rpc->call('listunspent', [1, 9999, [$from->value]]);
@@ -82,6 +100,8 @@ final readonly class BitcoinTxBuilder implements TxBuilder
             throw new RuntimeException("Ошибка listunspent: {$e->getMessage()}", 0, $e);
         }
 
+        // Шаг 2 (GUIDE §3): Greedy largest-first — крупные UTXO в начало.
+        // Минимизирует число входов → меньше vsize → меньше комиссия.
         usort($utxos, function (array $a, array $b): int {
             $av = (float) ($a['amount'] ?? 0);
             $bv = (float) ($b['amount'] ?? 0);
@@ -132,8 +152,11 @@ final readonly class BitcoinTxBuilder implements TxBuilder
             );
         }
 
+        // Шаг 3 (GUIDE §3): считаем сдачу.
         $changeSat = $sumSat - $amountSat - $feeSat;
-        // Если сдача меньше пылевого порога (dust threshold, 546 sat) — добавляем её в комиссию.
+        // ⚠️ Dust threshold = 546 сатоши (GUIDE §3, врезка про единицы):
+        // ниже этого порога создавать UTXO бессмысленно — будущая комиссия
+        // за её трату превысит саму сумму. Поэтому отдаём «пыль» майнерам.
         if ($changeSat > 0 && $changeSat < 546) {
             $changeSat = 0;
             $outputCount = 1;
@@ -165,6 +188,17 @@ final readonly class BitcoinTxBuilder implements TxBuilder
         );
     }
 
+    /**
+     * BIP-125 RBF — пересборка транзакции с повышенной комиссией.
+     *
+     * Условия Bitcoin для замены (GUIDE.md, Урок 11 — «BIP-125 в Bitcoin: подробнее»):
+     *  - Все входы новой транзакции имеют sequence < 0xfffffffe (opt-in RBF).
+     *  - Новая транзакция платит достаточно высокую дополнительную fee (не ниже min-relay).
+     *  - Она тратит хотя бы один из тех же входов, что и старая.
+     *
+     * ⚠️ Поэтому здесь мы берём ИМЕННО ТЕ ЖЕ входы из `previousExtras['inputs']`
+     * (а не делаем новый listunspent) и принудительно выставляем `sequence = 0xfffffffd`.
+     */
     public function rebuild(
         Chain $chain,
         HotAddress $from,

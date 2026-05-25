@@ -18,13 +18,21 @@ use RuntimeException;
 use Throwable;
 
 /**
- * EVM lookup: `eth_getTransactionByHash` + `eth_blockNumber`.
+ * EVM-наблюдение подтверждений для исходящих транзакций.
  *
- *  - `result === null` (узел не помнит транзакцию) ⇒ {@see ConfirmationObservation::dropped()}.
- *  - `blockNumber === null` (есть, но pending в мемпуле) ⇒ {@see ConfirmationObservation::pending()}.
+ * Логика (GUIDE.md, Урок 6 «Подтверждения для исходящих транзакций»):
+ *
+ *  - `eth_getTransactionByHash(hash)` → `null` ⇒ нода «забыла» транзакцию,
+ *    {@see ConfirmationObservation::dropped()}.
+ *  - `blockNumber === null` (есть, но pending в mempool) ⇒
+ *    {@see ConfirmationObservation::pending()}.
  *  - иначе ⇒ confirmations = headBlock − txBlock + 1 (минимум 1).
  *
- * Здесь намеренно два RPC-запроса вместо одного `eth_getTransactionReceipt` (где confirmations не возвращается напрямую). Кэширование `eth_blockNumber` между tx'ами в одном тике — задача Phase 7+ (NodeHealth + batch RPC).
+ * ⚠️ Два RPC-запроса вместо одного `eth_getTransactionReceipt` намеренно:
+ * receipt не возвращает confirmations напрямую, пришлось бы ещё раз ходить за
+ * head. Кэширование `eth_blockNumber` между tx'ами в тике — потенциальная оптимизация.
+ *
+ * @see \GUIDE.md  Урок 6 (#урок-6--подтверждения-и-финализация)
  */
 final readonly class EvmWithdrawalConfirmationLookup implements WithdrawalConfirmationLookup
 {

@@ -6,8 +6,8 @@ RUN apk add --no-cache git ca-certificates
 
 COPY . .
 
-# go.sum is generated on the fly (we don't ship one yet); the project will
-# add a checked-in go.sum once the dep graph stabilises (Phase 7+).
+# go.sum is generated on the fly (we don't ship one yet); a checked-in
+# go.sum should be added once the dep graph stabilises.
 RUN go mod tidy
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \

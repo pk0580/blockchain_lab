@@ -14,8 +14,8 @@ use App\Modules\Withdrawal\Domain\ValueObject\NonceValue;
  * полагается на PG advisory_xact_lock + UNIQUE (chain_id, hot_address, nonce).
  *
  * Для семейств без nonce-модели (Bitcoin) реализация может либо бросать
- * исключение, либо возвращать NonceValue(0) — Phase 6.2 будет вызывать
- * allocate только для EVM. Контракт не пытается это запретить: гибче.
+ * исключение, либо возвращать NonceValue(0) — RequestWithdrawalAction
+ * вызывает allocate только для EVM. Контракт это не запрещает: гибче.
  */
 interface NonceAllocator
 {

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('chain_id', 64);
             $table->string('hot_address', 96);
             $table->unsignedBigInteger('nonce');
-            $table->uuid('withdrawal_id')->nullable();  // Phase 6.2 заполняет
+            $table->uuid('withdrawal_id')->nullable();  // Заполняется после привязки к withdrawal
             $table->timestampTz('allocated_at');
             $table->timestampTz('used_at')->nullable();
 

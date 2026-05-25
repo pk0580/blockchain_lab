@@ -17,12 +17,23 @@ use DateTimeImmutable;
 use RuntimeException;
 
 /**
- * Маппит {@see FeePriority} в (target blocks, mode) для `estimatesmartfee`.
- * Bitcoin Core возвращает feerate в BTC/kB; конвертируем в sat/vbyte
- * как `ceil(btc_per_kb * 1e8 / 1000)`, чтобы не вылететь под mempool min-relay.
+ * Bitcoin fee estimator поверх `estimatesmartfee` (GUIDE.md, Урок 9 «Bitcoin: sat/vbyte»).
  *
- * Если RPC вернул feerate == -1 (нет данных у ноды; типично на regtest без
- * истории) — fallback на `min_sat_per_vbyte` из конфига.
+ * Алгоритм:
+ *  1. {@see FeePriority} → (target blocks, mode):
+ *     Low      → conservative, дальний target
+ *     Standard → economical/conservative, средний target
+ *     High     → economical, ближний target
+ *  2. RPC `estimatesmartfee(target, mode)` → feerate в BTC/kB.
+ *  3. Конвертация: `sat_per_vbyte = ceil(btc_per_kb * 1e8 / 1000)`.
+ *     ⚠️ Через bcmath, не float (теряется точность на больших суммах).
+ *  4. Если RPC вернул -1 (нет данных у ноды — типично на пустом regtest)
+ *     → fallback на `min_sat_per_vbyte` из конфига.
+ *
+ * Итоговая комиссия = `sat_per_vbyte * vsize`, где vsize оценивает {@see BitcoinTxBuilder}
+ * по эвристике 110·inputs + 34·outputs + 10.
+ *
+ * @see \GUIDE.md  Урок 9 (#урок-9--комиссия-fee)
  */
 final readonly class BitcoinFeeEstimator implements FeeEstimator
 {

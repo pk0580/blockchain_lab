@@ -17,17 +17,29 @@ use DateTimeImmutable;
 use RuntimeException;
 
 /**
- * Оценщик (estimator) по стандарту EIP-1559:
- *  - Получает `eth_feeHistory` за {@see self::HISTORY_BLOCKS} последних блоков для
- *    одного процентиля (10/50/90 для Low/Standard/High).
- *  - baseFee = последний `baseFeePerGas` (это baseFee для следующего блока).
- *  - priorityFee = среднее ненулевых сэмплов процентиля в окне (отсеиваем 0,
- *    которые приходят на пустых блоках testnet).
- *  - maxFeePerGas = baseFee * multiplier + priorityFee
- *    (запас на случай до двух подряд полных блоков, где baseFee увеличивается на 12.5%).
+ * EVM fee estimator по стандарту EIP-1559 (GUIDE.md, Урок 9 «EVM: EIP-1559»).
  *
- * gasLimit для перевода нативного актива = 21000 (фиксированный протокольный минимум).
- * ERC-20 и сложные контракты — отдельная логика в Фазе 8+.
+ * Транзакция в EIP-1559 указывает:
+ *   - max_fee_per_gas        — потолок (base_fee + priority, что вы готовы платить).
+ *   - max_priority_fee_per_gas — tip майнеру/валидатору сверху.
+ * Фактическая стоимость: `min(max_fee, base_fee + priority)`.
+ *
+ * Алгоритм:
+ *  1. `eth_feeHistory(4, "latest", [percentile])` — 4 последних блока для
+ *     перцентиля (10/50/90 на Low/Standard/High).
+ *  2. base_fee = baseFeePerGas[последний] — это base fee следующего (pending) блока.
+ *     ⚠️ Это уже посчитанное сетью значение (детерминированный гомеостаз).
+ *  3. priority_fee = среднее ненулевых сэмплов перцентиля.
+ *     Нули отбрасываем — это пустые блоки тестнета, неинформативные.
+ *  4. max_fee_per_gas = base_fee * multiplier + priority_fee.
+ *     ⚠️ multiplier ≈ 1.25 даёт запас на 2 подряд полных блока: 1.125² ≈ 1.27.
+ *  5. Защита: если max_fee = 0 (пустой тестнет с base_fee=0, priority=0) →
+ *     принудительно 1 wei, иначе нода отклонит.
+ *
+ * gas_limit для перевода нативного актива = 21000 (протокольный минимум).
+ * ERC-20 и сложные контракты — отдельная логика, ещё не реализована.
+ *
+ * @see \GUIDE.md  Урок 9 (#урок-9--комиссия-fee)
  */
 final readonly class EvmFeeEstimator implements FeeEstimator
 {

@@ -41,7 +41,7 @@ it('advances strictly by one block', function (): void {
         ->toThrow(\InvalidArgumentException::class);
 });
 
-it('does not regress on a shorter observed head (Phase 5 will handle reorgs)', function (): void {
+it('does not regress on a shorter observed head (reorgs are handled by ReorgDetection)', function (): void {
     $cursor = ScanCursor::initialise(new ChainId('btc'), new BlockHeight(10), new DateTimeImmutable());
     $cursor->observeHead(new BlockHeight(5), new DateTimeImmutable());
 

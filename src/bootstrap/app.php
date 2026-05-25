@@ -14,7 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Phase 7.3 — глобальная идемпотентность для POST с `Idempotency-Key`.
+        // Глобальная идемпотентность для POST с `Idempotency-Key`.
         $middleware->api(append: [
             IdempotencyMiddleware::class,
         ]);

@@ -8,6 +8,15 @@ use App\Modules\Confirmation\Domain\Event\TransactionConfirmed;
 use App\Modules\Webhook\Application\UseCase\RecordOutboxMessage\RecordOutboxMessageAction;
 use App\Modules\Webhook\Application\UseCase\RecordOutboxMessage\RecordOutboxMessageData;
 
+/**
+ * Confirmation::TransactionConfirmed → Webhook outbox (`transaction.confirmed`).
+ *
+ * Подписанные клиенты получают уведомление о том, что входящая транзакция
+ * достигла requiredConfirmations. Доставка через transactional outbox
+ * (GUIDE.md, Урок 12.2) — at-least-once.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
+ */
 final readonly class RecordOutboxOnTransactionConfirmed
 {
     public function __construct(private RecordOutboxMessageAction $action) {}

@@ -14,21 +14,27 @@ use Illuminate\Http\Client\Factory as HttpFactory;
 use Throwable;
 
 /**
- * HTTP-доставка с HMAC-SHA256 подписью. Headers:
+ * HTTP-доставка webhook'а с HMAC-подписью (GUIDE.md, Урок 12.3).
  *
+ * Запрос:
  *   POST <subscription.url>
  *   Content-Type: application/json
- *   X-Webhook-Event: <event.name>
+ *   X-Webhook-Event:    <event.name>
  *   X-Webhook-Delivery: <delivery.id>
- *   X-Timestamp: <epoch seconds>
- *   X-Signature: sha256=<hex>
+ *   X-Timestamp:        <epoch seconds>
+ *   X-Signature:        sha256=<hex>
  *
  * Body — JSON `{"event": ..., "data": <payload>, "delivery_id": ...}`.
  *
- * Outcome:
- *   - 2xx → delivered.
- *   - 4xx → failed (non-retryable).
- *   - 5xx / timeout / DNS → retryable.
+ * Решение по статусу ответа (GUIDE §12.3 конец):
+ *   - 2xx                  → delivered (успех).
+ *   - 4xx                  → failed (постоянная ошибка, ретраить бессмысленно).
+ *   - 5xx / timeout / DNS  → retryable (повторим позже).
+ *
+ * Таймауты — обязательны (GUIDE §12, паттерн Resilience): «нет приемлемого
+ * default-а ‘ждать вечно’».
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class HttpWebhookDispatcher implements WebhookDispatcher
 {

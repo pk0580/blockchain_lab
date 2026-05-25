@@ -9,16 +9,23 @@ use App\Modules\Network\Domain\ValueObject\ChainFamily;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 
 /**
- * Реализует порт модуля BlockIngestion, используя Redis SET для каждого семейства сетей.
- * Находится в Address::Infrastructure, так как модуль Address владеет источником
- * истины (таблица `addresses`) и является естественным швом между этими двумя модулями.
+ * Прод-реализация {@see AddressDirectory} через Redis SET для каждого семейства.
  *
- * Формат хранения:
- *   key   = "{prefix}:{family}"
- *   value = строки адресов, добавленные через SADD
+ * Почему именно Redis SET (GUIDE.md, Урок 5 — раздел «Почему Redis, а не PostgreSQL»):
+ *  - SISMEMBER = O(1) hash-lookup in-memory, десятки микросекунд по сети.
+ *  - PostgreSQL дал бы O(log n) + накладные расходы парсинга/MVCC/fsync —
+ *    на «горячем пути» сканера это уже боттлнек.
+ *  - Шардирование по семейству: `bl:addr:bitcoin`, `bl:addr:evm`, `bl:addr:tron`
+ *    — BTC-сканер никогда не «трогает» EVM-набор.
  *
- * Фаза 4 поддерживает этот список актуальным через слушатель события AddressGenerated.
- * Команда для первоначального заполнения из таблицы addresses появится в Фазе 7.
+ * ⚠️ Это денормализованная проекция, НЕ источник истины. Источник — таблица
+ * `addresses` в PostgreSQL. Если Redis потеряет данные — набор перестраивается
+ * (rebuild-команда в roadmap), durability тут не нужна.
+ *
+ * Поддерживается актуальным через слушатель события AddressGenerated
+ * ({@see \App\Modules\Address\Infrastructure\Listener\RegisterAddressInDirectory}).
+ *
+ * @see \GUIDE.md  Урок 5 (#урок-5--сканирование-цепи-и-обнаружение-поступлений)
  */
 final readonly class RedisAddressDirectory implements AddressDirectory
 {

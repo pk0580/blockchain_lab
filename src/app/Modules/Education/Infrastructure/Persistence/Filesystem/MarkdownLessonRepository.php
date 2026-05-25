@@ -16,8 +16,8 @@ use Spatie\YamlFrontMatter\YamlFrontMatter;
 /**
  * Читает уроки с диска: `content/lessons/{NN-module}/{NN-slug}.md`. Уроки
  * статичные — кешируем результат в-инстансе после первого `all()`. Для
- * production cache можно обернуть в `Cache::remember` Phase 9, но даже
- * 50 markdown'ов парсятся быстрее одного RTT'а к Redis'у.
+ * production cache можно обернуть в `Cache::remember`, но даже 50 markdown'ов
+ * парсятся быстрее одного RTT'а к Redis'у.
  *
  * Формат файла:
  *

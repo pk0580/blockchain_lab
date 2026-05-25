@@ -11,7 +11,7 @@ use Inertia\Response;
 
 /**
  * GET /admin — initial render админ-дашборда. После загрузки страница
- * сама поллит JSON-эндпоинт `/api/admin/dashboard` (Phase 8.4 — 5s).
+ * сама поллит JSON-эндпоинт `/api/admin/dashboard` каждые 5 секунд.
  */
 final readonly class ShowAdminDashboardController
 {

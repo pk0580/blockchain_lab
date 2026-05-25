@@ -20,13 +20,24 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\DatabaseManager;
 
 /**
- * Прогоняет все pending-строки одной сети и приводит число подтверждений к
- * текущему скан-курсору. События переходов состояния (Confirming, Confirmed,
- * Finalized) эмитятся только когда статус строки реально меняется.
+ * Тик подтверждений для одной сети: пересчитывает все non-Finalized входящие
+ * транзакции относительно текущего скан-курсора.
  *
- * Per-row updates идут одной транзакцией. Confirmation никогда не создаёт
- * новые строки — это работа BlockIngestion — поэтому на чужих писателей не
- * наезжаем.
+ * Алгоритм (GUIDE.md, Урок 6 — раздел «Кто это запускает»):
+ *
+ *   1. Получить lastScannedHeight сети через {@see ChainScannerHead}
+ *      (кросс-модульный порт — Confirmation не зависит от BlockIngestion).
+ *   2. Загрузить все pending IncomingTransaction для этой сети.
+ *   3. Для каждой посчитать новый outcome через {@see ConfirmationCalculator}.
+ *   4. Если статус изменился — UPDATE + диспатч события
+ *      (TransactionConfirming / TransactionConfirmed / TransactionFinalized).
+ *   5. Если число не изменилось — no-op, чтобы не плодить событий (идемпотентность).
+ *
+ * ⚠️ Confirmation никогда не создаёт новые строки (это работа BlockIngestion)
+ * и никогда не уменьшает confirmations (откат при реорге — отдельный путь
+ * Orphaned через модуль ReorgDetection, Урок 7).
+ *
+ * @see \GUIDE.md  Урок 6 (#урок-6--подтверждения-и-финализация)
  */
 final readonly class UpdateConfirmationsAction
 {

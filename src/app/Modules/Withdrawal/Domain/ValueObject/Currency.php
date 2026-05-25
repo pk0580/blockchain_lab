@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 /**
  * Тикер валюты на withdrawal. Для нативной транзакции (BTC, ETH) совпадает с
- * native currency сети; для ERC-20 будет токен (USDC, ...), но это Phase 6.5+.
+ * native currency сети; для ERC-20-токенов (USDC и т.п.) — символ токена.
  */
 final readonly class Currency
 {

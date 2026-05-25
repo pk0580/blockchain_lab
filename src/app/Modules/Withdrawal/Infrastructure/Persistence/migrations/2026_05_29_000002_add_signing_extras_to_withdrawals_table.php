@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Phase 6.3: сохраняем "сборочные метаданные" транзакции (signing_extras).
+ * Сохраняем "сборочные метаданные" транзакции (signing_extras).
  * Это критично для BIP-125 RBF на BTC: replacement-транзакция должна
  * использовать тот же набор UTXO (inputs), что и оригинал, иначе это
  * не replacement, а двойная трата.

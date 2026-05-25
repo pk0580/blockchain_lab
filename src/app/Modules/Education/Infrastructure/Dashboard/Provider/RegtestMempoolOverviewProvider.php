@@ -13,8 +13,8 @@ use App\Modules\Network\Domain\ValueObject\ChainFamily;
 use Throwable;
 
 /**
- * Mempool снимок per-chain. Phase 8.4 умеет читать только Bitcoin regtest
- * (`getrawmempool` — стрингов tx_id, считаем их количество).
+ * Mempool снимок per-chain. Реализован только для Bitcoin regtest
+ * (`getrawmempool` — список tx_id, считаем их количество).
  *
  * EVM/Tron строки тоже включаем, но `txCount=null` + поясняющий `error`,
  * чтобы admin видел, что сеть в системе, но mempool ещё не подключен.

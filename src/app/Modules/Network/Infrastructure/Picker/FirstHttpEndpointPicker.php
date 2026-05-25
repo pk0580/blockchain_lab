@@ -14,8 +14,8 @@ use App\Modules\Network\Domain\ValueObject\RpcKind;
  * Дефолтная реализация picker'а: первый endpoint нужного kind'а в порядке
  * регистрации. Используется когда NodeHealth не подключен (или для unit-тестов).
  *
- * При наличии нескольких endpoint'ов с одинаковым `priority` тиралий побеждает
- * первый зарегистрированный — Phase 9 добавит weighted round-robin.
+ * При наличии нескольких endpoint'ов с одинаковым `priority` побеждает первый
+ * зарегистрированный (weighted round-robin не реализован).
  */
 final readonly class FirstHttpEndpointPicker implements RpcEndpointPicker
 {

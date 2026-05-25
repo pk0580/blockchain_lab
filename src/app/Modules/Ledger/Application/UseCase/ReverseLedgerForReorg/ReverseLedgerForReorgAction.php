@@ -15,12 +15,32 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Str;
 
 /**
- * Создаёт компенсирующие debit-проводки для каждой confirmed credit-записи,
- * чей блок попал в reorg-диапазон. Оригинальная запись помечается Reversed —
- * НЕ удаляется (audit trail сохраняется навечно).
+ * Откат проводок при реорге: создаёт встречные debit-записи для каждой
+ * confirmed credit, чей блок попал в orphaned-диапазон.
  *
- * Идемпотентна по выбору источника: репозиторий возвращает только записи в
- * статусе Confirmed; уже Reversed повторно не обрабатываются.
+ * Алгоритм (GUIDE.md, Урок 8 «Откат при реорге»):
+ *
+ *   1. Найти все LedgerEntry, у которых:
+ *      - chainId совпадает,
+ *      - blockHeight >= fromHeight (попадают в orphaned диапазон),
+ *      - status == Confirmed.
+ *   2. Для каждого:
+ *      - Создать новую запись LedgerEntry::reverse(original):
+ *           direction = original.direction.opposite() (Credit → Debit)
+ *           operationType = ReorgReversal
+ *           reversesEntryId = original.id
+ *      - Оригинал перевести в Reversed.
+ *   3. Поднять события LedgerEntryReversed после COMMIT.
+ *
+ * ⚠️ Оригинал НЕ удаляется (GUIDE §8): можно показать клиенту полную историю
+ * «3 мая зачислили 0.5 BTC → 4 мая блок отменён сетью → отменено компенсирующей
+ * проводкой».
+ *
+ * Идемпотентность: репозиторий возвращает только Confirmed; уже Reversed
+ * повторно не обрабатываются.
+ *
+ * @see \GUIDE.md  Урок 8 (#урок-8--двойная-бухгалтерия-ledger)
+ * @see \GUIDE.md  Урок 7 (#урок-7--реорганизации-цепи)
  */
 final readonly class ReverseLedgerForReorgAction
 {

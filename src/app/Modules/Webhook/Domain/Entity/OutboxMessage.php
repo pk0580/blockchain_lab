@@ -10,14 +10,19 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 
 /**
- * Запись transactional outbox'а — событие, которое нужно когда-то опубликовать
- * во все matching subscriptions. Пишется в том же транзакционном scope'е, что и
- * породивший aggregate, чтобы избежать dual-write inconsistency (см.
- * `.claude/rules/advanced_patterns.md → Transactional Outbox`).
+ * Запись transactional outbox — событие, которое нужно опубликовать клиентам.
  *
- * Pattern «mark published»: PublishOutboxAction берёт unpublished записи, для
- * каждой fan-out'ит deliveries, потом `markPublished($now)`. Удалять published
- * записи (retention) — задача отдельного scheduled cleanup, Phase 9.
+ * Решает проблему dual-write (GUIDE.md, Урок 12.2):
+ *  - DB::transaction(fn() => $repo->save($order));
+ *    $messageBus->publish(...);  // ← процесс упал здесь — клиент не получит уведомление
+ *
+ * Решение: пишем сообщение в `outbox_messages` В ТОЙ ЖЕ транзакции, что и
+ * бизнес-сущность. Отдельный воркер ({@see PublishOutboxAction}) находит
+ * unpublished записи, фан-аутит в deliveries и помечает published.
+ *
+ * Гарантия: at-least-once. Получатель должен сам быть идемпотентным.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final class OutboxMessage
 {

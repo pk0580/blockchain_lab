@@ -16,9 +16,18 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 
 /**
- * Корень агрегата (Aggregate root) для зарегистрированной блокчейн-сети. RpcEndpoint — это
- * объект-значение (VO) внутри границ агрегата; Chain владеет списком и обеспечивает
- * инвариант "как минимум один эндпоинт".
+ * Корень агрегата (Aggregate root) для зарегистрированной блокчейн-сети.
+ *
+ * Хранит метаданные конкретной сети: {@see ChainId}, {@see ChainName},
+ * {@see ChainFamily}, {@see NativeCurrency} (BTC, ETH, MATIC, …),
+ * {@see ConfirmationRequirement} и список {@see RpcEndpoint}.
+ *
+ * RpcEndpoint — VO внутри границ агрегата; Chain владеет списком и обеспечивает
+ * инвариант «как минимум один эндпоинт» (без RPC сеть бесполезна).
+ *
+ * Концепция «семейство vs сеть» подробно описана в GUIDE.md, Урок 4.
+ *
+ * @see \GUIDE.md  Урок 4 (#урок-4--l1-l2-и-семейства-сетей)
  */
 final class Chain
 {

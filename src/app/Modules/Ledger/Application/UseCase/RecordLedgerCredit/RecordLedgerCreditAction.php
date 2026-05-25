@@ -19,15 +19,23 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Запись credit-проводки при подтверждении входящей tx. Идемпотентна по
- * (operation_type=Deposit, operation_ref=incomingTransactionId): повторный
- * приход того же события вернёт `created=false` и ничего не вставит.
+ * Запись credit-проводки при подтверждении входящей tx (зачисление на баланс).
  *
- * Адрес-владельца резолвим через WalletOwnership-port. Если владельца нет
- * (тестовый кейс или адрес был зарегистрирован вне Address-модуля) — кидаем
- * WalletOwnershipMissingException и пусть слушатель сам решает: ретрай,
- * dead-letter или просто лог. На уровне Ledger нет «политики»: только
- * проводка.
+ * Алгоритм (GUIDE.md, Урок 8 «Зачисление при подтверждении»):
+ *
+ *   1. Идемпотентность: проверить, нет ли уже записи
+ *      (operationType=Deposit, operationRef=incomingTransactionId).
+ *      Если есть — created=false, выходим.
+ *   2. Подгрузить данные транзакции через {@see ConfirmedTransactionView}.
+ *   3. Через {@see WalletOwnership} найти, какому кошельку принадлежит адрес.
+ *      Если нет — {@see WalletOwnershipMissingException}.
+ *   4. Создать LedgerEntry::recordDeposit (Direction::Credit, Confirmed).
+ *   5. COMMIT → событие LedgerEntryRecorded после COMMIT.
+ *
+ * Идемпотентность спасает от повторной обработки одного и того же события
+ * (at-least-once доставка очередей / повторный диспатч).
+ *
+ * @see \GUIDE.md  Урок 8 (#урок-8--двойная-бухгалтерия-ledger)
  */
 final readonly class RecordLedgerCreditAction
 {

@@ -16,8 +16,15 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Каждую минуту: берём Pending deliveries с scheduledAt <= now и пытаемся доставить.
- * Сбой одной delivery не валит всю партию (catch + log).
+ * Реальная отправка HTTP-вебхуков (GUIDE.md, Урок 12.2, шаг 3 + Урок 12.6).
+ *
+ * Каждую минуту: берём Pending deliveries с scheduledAt ≤ now → дёргаем
+ * {@see DispatchWebhookDeliveryAction}, который через {@see HttpWebhookDispatcher}
+ * шлёт POST с HMAC-подписью. Сбой одной delivery не валит всю партию.
+ *
+ * Очередь — `webhooks`, изолированная от ingestion и подтверждений (bulkhead).
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final class DispatchDueDeliveriesJob implements ShouldQueue
 {

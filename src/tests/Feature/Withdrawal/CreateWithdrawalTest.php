@@ -318,7 +318,7 @@ it('replays the cached response on a repeat request (middleware-level idempotenc
     $second = $this->withHeaders(['Idempotency-Key' => 'idem-replay-001'])
         ->postJson('/api/v1/withdrawals', $payload);
 
-    // Phase 7.3 — middleware абсорбирует replay'и ДО контроллера, поэтому второй
+    // IdempotencyMiddleware абсорбирует replay'и ДО контроллера, поэтому второй
     // ответ — это ровно первый (202 + тот же body) + хедер X-Idempotent-Replay.
     $first->assertStatus(202);
     $second->assertStatus(202);

@@ -9,9 +9,18 @@ use DateTimeImmutable;
 
 /**
  * Котировка комиссии в конкретный момент времени для конкретной цепочки.
- * Хранит снимок (breakdown) и отметку времени — у комиссии есть TTL, потому
- * что условия mempool/baseFee меняются. Phase 6.2 при необходимости введёт
- * re-quote перед broadcast, если quote старше N секунд.
+ *
+ * `breakdown` — полиморфный объект, конкретный класс зависит от семейства
+ * (см. GUIDE.md, Урок 9, итоговая таблица «Bitcoin vs EVM»):
+ *   - {@see BitcoinFeeBreakdown} → sat/vbyte
+ *   - {@see EvmFeeBreakdown}     → max_fee_per_gas, max_priority_fee_per_gas, gas_limit
+ *
+ * Это позволяет одному {@see \App\Modules\Withdrawal\Domain\ValueObject\FeeQuoteSnapshot}
+ * лежать в `withdrawal.signing_extras` для любой сети.
+ *
+ * `estimatedAt` — у котировки есть TTL: условия mempool/base_fee меняются.
+ *
+ * @see \GUIDE.md  Урок 9 (#урок-9--комиссия-fee)
  */
 final readonly class FeeQuote
 {

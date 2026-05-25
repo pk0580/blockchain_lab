@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Phase 6.3: храним число подтверждений, увиденное polling-job'ом. Колонка
+ * Храним число подтверждений, увиденное polling-job'ом. Колонка
  * нужна, чтобы при повторном тике не плодить идентичные `WithdrawalConfirming`
  * события (idempotency для observability) и чтобы клиент мог отобразить
  * прогресс по GET /api/v1/withdrawals/{id}.

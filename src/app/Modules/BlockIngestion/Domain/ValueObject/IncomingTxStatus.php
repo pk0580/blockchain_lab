@@ -15,8 +15,8 @@ use App\Modules\BlockIngestion\Domain\Exception\InvalidStatusTransitionException
  *   finalized  → блок tx ушёл глубже chain.max_reorg_depth, reorg больше невозможен.
  *   orphaned   → блок tx выпал из канонической цепи в результате реорганизации.
  *
- * Phase 4 покрывал только detected → confirming → confirmed.
- * Phase 5 добавляет finalized (terminal) и orphaned (re-detection в новой цепи возможна).
+ * Terminal: finalized. Orphaned ставит ReorgDetection — после ре-сканирования
+ * новой версии блока tx может снова стать detected → confirming → confirmed.
  */
 enum IncomingTxStatus: string
 {

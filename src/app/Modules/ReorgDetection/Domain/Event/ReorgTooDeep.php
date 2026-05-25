@@ -10,8 +10,8 @@ use DateTimeImmutable;
 
 /**
  * Сигнализирует, что reorg затронул блок, который уже считался finalized
- * (глубже chain.max_reorg_depth). Phase 5 факт регистрирует, но handler
- * (остановка withdrawal-воркера, оператор-алерт) реализуется в Phase 6.
+ * (глубже chain.max_reorg_depth). Обработчик в Withdrawal ставит сеть на
+ * паузу (см. PauseChainOnReorgTooDeep).
  */
 final readonly class ReorgTooDeep
 {

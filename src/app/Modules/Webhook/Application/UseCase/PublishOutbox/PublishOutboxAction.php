@@ -13,13 +13,20 @@ use DateTimeImmutable;
 use Illuminate\Database\DatabaseManager;
 
 /**
- * Берёт N unpublished outbox messages, для каждой fan-out'ит в matching
- * subscriptions: создаёт `WebhookDelivery` per (message, subscription), сохраняет.
- * После успешного fan-out помечает outbox message published.
+ * Outbox publisher (GUIDE.md, Урок 12.2, шаг 2).
  *
- * Fan-out + mark-published — одна транзакция per outbox message: если процесс
- * падает между ними, повторный запуск увидит unpublished и создаст delivery'и
- * заново — duplicate prevention лежит на UNIQUE constraint (outbox_id, subscription_id).
+ * Алгоритм:
+ *   1. Берёт N unpublished outbox messages.
+ *   2. Для каждой находит активные subscriptions для её event_name.
+ *   3. Создаёт {@see WebhookDelivery} per (message, subscription).
+ *   4. markPublished($now) на сообщении.
+ *   5. Реальная HTTP-отправка — отдельным job {@see DispatchDueDeliveriesJob}.
+ *
+ * ⚠️ Fan-out + mark-published — одна транзакция per outbox message: если
+ * процесс падает между ними, повторный запуск увидит unpublished и создаст
+ * deliveries заново. Дубликаты ловит UNIQUE constraint на (outbox_id, subscription_id).
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class PublishOutboxAction
 {

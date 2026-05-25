@@ -90,7 +90,7 @@ final class NetworkServiceProvider extends ServiceProvider
                 ),
             );
 
-            // Tron остаётся на NoOp до Phase 6.5+.
+            // Tron пока на NoOp — полноценный TronAdapter ещё не реализован.
             $registry->registerFamily(
                 ChainFamily::Tron,
                 fn (Chain $chain): ChainAdapter => new NoOpChainAdapter($chain),

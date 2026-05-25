@@ -9,9 +9,16 @@ use App\Modules\Withdrawal\Domain\Contract\ChainPauseRegistry;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 
 /**
- * Реализация поверх Laravel Cache (Redis в проде, array-store в тестах).
- * Pause-state — не транзакционная и не критичная для целостности: дубликат
- * SET-команды нормален, TTL продлевается.
+ * Хранилище паузы сети — поверх Laravel Cache (Redis в проде, array в тестах).
+ *
+ * Используется для «остановить все исходящие на эту сеть» при подозрительных
+ * условиях (слишком глубокий reorg, ручной аварийный stop). См. GUIDE.md,
+ * Урок 11 «Пауза сети» и Урок 7 «Реакция других модулей».
+ *
+ * Не транзакционная и не критичная для целостности: дубликат SET-команды
+ * нормален, TTL продлевается. Cache::flush() в тестах сбрасывает паузы.
+ *
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 final readonly class CacheChainPauseRegistry implements ChainPauseRegistry
 {

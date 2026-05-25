@@ -39,8 +39,8 @@ func New(cfg *config.Config, log *slog.Logger, store seed.Store) *http.Server {
 		r.Post("/v1/addresses/derive", h.derive)
 		r.Post("/v1/addresses/validate", h.validate)
 
-		// Phase 8.2 — educational ephemeral endpoints. Возвращают приватный
-		// ключ в открытом виде; никогда не использовать для реальных средств.
+		// Educational ephemeral endpoints. Возвращают приватный ключ в
+		// открытом виде; никогда не использовать для реальных средств.
 		r.Post("/v1/playground/keypair", h.playgroundKeypair)
 		r.Post("/v1/playground/sign", h.playgroundSign)
 		r.Post("/v1/playground/decode", h.playgroundDecode)

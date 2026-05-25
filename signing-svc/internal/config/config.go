@@ -12,7 +12,7 @@ import (
 type Config struct {
 	ListenAddr        string
 	LogLevel          string
-	BearerToken       string // общий секрет, который должны предоставить вызывающие стороны (Фаза 7 → mTLS)
+	BearerToken       string // общий секрет, который должны предоставить вызывающие стороны (mTLS — потенциальное усиление)
 	SeedDir           string // директория, содержащая запечатанные HD-сиды
 	SeedEncryptionKey []byte // 32 байта, закодированные в hex в окружении
 }

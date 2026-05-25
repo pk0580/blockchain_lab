@@ -35,6 +35,20 @@ type createSeedResp struct {
 	Created   bool   `json:"created"`
 }
 
+// createSeed обрабатывает POST /v1/seeds — создаёт новый сид (или импортирует
+// существующую мнемонику) и сохраняет в зашифрованный файл .sealed.
+//
+// ⚠️ Идемпотентность по reference: если сид уже существует — возвращаем 200
+// {created: false}, мнемонику НЕ перегенерируем. Это критично для надёжности
+// вызывающей стороны: CreateHdSeedAction в Laravel может ретраиться (GUIDE.md,
+// Урок 2 «Почему именно такой порядок ‘сначала signing-svc, потом БД’»).
+//
+// Возвращаемые статусы:
+//
+//	201 Created — новый сид создан;
+//	200 OK      — сид с таким reference уже существовал;
+//	400         — невалидный reference / битая мнемоника;
+//	500         — ошибка хранилища.
 func (h *handlers) createSeed(w http.ResponseWriter, r *http.Request) {
 	var req createSeedReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -45,6 +59,7 @@ func (h *handlers) createSeed(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "missing_reference", "reference is required")
 		return
 	}
+	// Идемпотентность: проверяем по имени файла, не пытаясь даже расшифровать.
 	exists, err := h.seeds.Exists(req.Reference)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "store_error", err.Error())
@@ -54,6 +69,8 @@ func (h *handlers) createSeed(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, createSeedResp{Reference: req.Reference, Created: false})
 		return
 	}
+	// Два режима: либо генерим новую мнемонику (BIP-39, 256 бит энтропии),
+	// либо импортируем переданную (для миграции/восстановления).
 	var s *seed.Seed
 	if req.Mnemonic == "" {
 		s, err = seed.Generate(req.Reference, "")

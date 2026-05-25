@@ -22,13 +22,25 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\DatabaseManager;
 
 /**
- * Срабатывает при каждом BlockIngested-событии: сверяет parent_hash нового
- * блока со stored-предшественником и, если зафиксирован reorg, выполняет
- * компенсаторный набор операций (orphan, delete, rollback) и публикует
- * ReorgDetected + при превышении max_reorg_depth — ReorgTooDeep.
+ * Реакция на каждое BlockIngested: проверка реорга и компенсирующие операции.
  *
- * Работает идемпотентно: повторный приход того же события не запустит вторую
+ * При обнаружении reorg в одной транзакции (GUIDE.md, Урок 7 «Что делает
+ * Action при обнаружении reorg»):
+ *
+ *   1. orphanIncomingAtHeight(chainId, H-1) — пометить наши IncomingTransaction
+ *      из этой высоты статусом Orphaned (а не удалить).
+ *   2. deleteBlockAtHeight(chainId, H-1) — удалить запись блока.
+ *   3. rollbackScanCursorTo(chainId, H-2) — откатить курсор на шаг назад.
+ *      Это заставит сканер снова попытаться скачать H-1, но уже новую версию.
+ *
+ * После COMMIT поднимаются:
+ *   - ReorgDetected (всегда) — слушают Ledger, Webhook.
+ *   - ReorgTooDeep  — если depth > maxReorgDepth → Withdrawal ставит сеть на паузу.
+ *
+ * Идемпотентность: повторный приход того же события не запустит вторую
  * компенсацию (stored prev будет уже удалён или совпадёт с parent_hash).
+ *
+ * @see \GUIDE.md  Урок 7 (#урок-7--реорганизации-цепи)
  */
 final readonly class EvaluateBlockReorgAction
 {
@@ -73,11 +85,18 @@ final readonly class EvaluateBlockReorgAction
         /** @var BlockHeight $orphanedHeight */
         $orphanedHeight = $analysis->orphanedHeight;
 
+        // GUIDE §7 «Что делает Action при обнаружении reorg» — все три
+        // компенсирующие операции строго в одной транзакции, иначе можно
+        // оставить курсор без блока или блок без события.
         $orphanedCount = 0;
         $this->db->transaction(function () use ($chainId, $orphanedHeight, &$orphanedCount): void {
+            // Шаг 1: не удаляем IncomingTransaction — помечаем Orphaned.
+            // Аудит сохраняется (см. также Ledger::reverse, Урок 8).
             $orphanedCount = $this->writer->orphanIncomingAtHeight($chainId, $orphanedHeight);
+            // Шаг 2: удаляем запись блока, чтобы её место занял новый блок при ре-скане.
             $this->writer->deleteBlockAtHeight($chainId, $orphanedHeight);
-
+            // Шаг 3: курсор откатываем ровно на один блок назад. Walk-back
+            // глубже одного шага делается итеративно через цикл сканера.
             $rollbackTarget = new BlockHeight(max(0, $orphanedHeight->value - 1));
             $this->writer->rollbackScanCursorTo($chainId, $rollbackTarget);
         });

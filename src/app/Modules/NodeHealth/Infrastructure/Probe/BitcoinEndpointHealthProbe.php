@@ -15,12 +15,17 @@ use DateTimeImmutable;
 use Throwable;
 
 /**
- * Bitcoin probe: `getblockcount` — самый дешёвый RPC. Latency измеряем
- * `microtime`-обёрткой вокруг single call'а.
+ * Bitcoin health probe (GUIDE.md, Урок 12.4): `getblockcount` (дешевейший RPC).
  *
- * Rule «degraded»: ответ > 2 секунд OR head_height lag > некоторый порог
- * (порог пока не сравниваем — это нужно вычислять относительно других peer'ов,
- * Phase 9 принесёт). Здесь: ≥2000ms = Degraded, else Healthy.
+ * Логика та же, что у {@see EvmEndpointHealthProbe}:
+ *   - меряем RTT;
+ *   - любая ошибка → Unhealthy;
+ *   - ≥ 2000 ms → Degraded;
+ *   - иначе → Healthy.
+ *
+ * Сравнение head_height с другими пирами (lag-detection) пока не реализовано.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class BitcoinEndpointHealthProbe implements EndpointHealthProbe
 {

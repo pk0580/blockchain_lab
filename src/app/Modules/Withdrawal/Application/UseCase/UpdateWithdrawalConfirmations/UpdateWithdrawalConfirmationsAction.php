@@ -18,19 +18,25 @@ use Illuminate\Database\DatabaseManager;
 use RuntimeException;
 
 /**
- * Опрашивает узел про конкретный withdrawal и продвигает state machine:
+ * Опрашивает ноду про конкретный withdrawal и продвигает state machine:
  *
  *   Broadcasted ──(>=1 conf)──▶ Confirming ──(>=required)──▶ Confirmed
  *
- * Идемпотентность: метод `Withdrawal::markAsConfirming` сам выходит без изменений,
- * если confirmations не меняется — поэтому повторные тики не плодят события.
+ * Аналог Confirmation::UpdateConfirmationsAction (Урок 6), но для нашей собственной
+ * исходящей транзакции. Подробнее — GUIDE.md, Урок 6, раздел «Подтверждения для
+ * исходящих транзакций».
  *
- * Действие НЕ перезаписывает Confirming → Broadcasted, если узел временно показал
- * 0 (например, после короткой реорганизации). Регресс счётчика обрабатывает
- * ReorgDetection через свой `Withdrawal` rollback (Phase 7+).
+ * Реализация наблюдения зависит от семейства: EVM → {@see EvmWithdrawalConfirmationLookup}
+ * (eth_getTransactionByHash + eth_blockNumber).
  *
- * `dropped` (узел не помнит транзакцию) сейчас просто логируется в результате —
- * решение «помечать ли Failed» делает Phase 7+ когда добавим политику возраста.
+ * Идемпотентность: метод `Withdrawal::markAsConfirming` no-op, если confirmations
+ * не изменилось — повторные тики не плодят событий.
+ *
+ * ⚠️ Action не перезаписывает Confirming → Broadcasted, если узел временно
+ * показал 0 (например, после короткой реорганизации). Регресс счётчика
+ * обрабатывает ReorgDetection через свой rollback-путь.
+ *
+ * @see \GUIDE.md  Урок 6 (#урок-6--подтверждения-и-финализация)
  */
 final readonly class UpdateWithdrawalConfirmationsAction
 {

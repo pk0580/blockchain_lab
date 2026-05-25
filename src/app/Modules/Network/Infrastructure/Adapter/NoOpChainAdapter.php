@@ -19,8 +19,8 @@ use App\Modules\Network\Infrastructure\Registry\ConfirmationBasedFinality;
 
 /**
  * Test double. Behaves like a healthy adapter pinned at a fixed head with
- * permissive address validation. Concrete adapters (BitcoinAdapter,
- * EvmAdapter, TronAdapter) land in Phase 4.
+ * permissive address validation. Concrete adapters live next to it:
+ * {@see BitcoinAdapter}, {@see EvmAdapter}.
  */
 final readonly class NoOpChainAdapter implements ChainAdapter, AddressValidator, FeeEstimator
 {

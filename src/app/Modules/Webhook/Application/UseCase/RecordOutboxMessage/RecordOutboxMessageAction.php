@@ -17,12 +17,12 @@ use DateTimeImmutable;
  * **Важно:** должен вызываться внутри транзакции, которая записывала aggregate —
  * это критерий transactional outbox pattern (см. `.claude/rules/advanced_patterns.md`).
  * Listener'ы из других модулей подписываются через `afterCommit` ИЛИ в том же
- * transaction scope. В Phase 7.2 listener подписывается на `WithdrawalConfirmed`
- * (которое уже dispatched после COMMIT'а в Withdrawal), поэтому пишет в свою
- * собственную транзакцию — это «approximate» outbox: окно между COMMIT'ом
- * Withdrawal и записью outbox существует, но мало, и upstream-листенер
- * идемпотентен по `aggregateId`. Полноценный transactional outbox с записью
- * inside-the-source-transaction — Phase 9.
+ * transaction scope. Сейчас listener подписан на `WithdrawalConfirmed` (которое
+ * уже dispatched после COMMIT'а в Withdrawal), поэтому пишет в свою собственную
+ * транзакцию — это «approximate» outbox: окно между COMMIT'ом Withdrawal и
+ * записью outbox существует, но мало, и upstream-listener идемпотентен по
+ * `aggregateId`. Полноценный transactional outbox с записью inside-the-
+ * source-transaction — потенциальное усиление.
  */
 final readonly class RecordOutboxMessageAction
 {

@@ -8,8 +8,8 @@ use App\Modules\Education\Application\DTO\Dashboard\NodeHealthSection;
 
 /**
  * Тянет последний health snapshot по всем зарегистрированным сетям и
- * проецирует их в плоский ряд endpoint-строк. Реализация (Phase 8.4) идёт
- * к `NodeHealth::EndpointHealthRegistry` + `Network::ChainRepository`.
+ * проецирует их в плоский ряд endpoint-строк. Реализация ходит в
+ * `NodeHealth::EndpointHealthRegistry` + `Network::ChainRepository`.
  */
 interface NodeHealthOverviewProvider
 {

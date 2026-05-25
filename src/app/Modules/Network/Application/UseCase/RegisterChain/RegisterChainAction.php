@@ -18,6 +18,16 @@ use DateTimeImmutable;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\DatabaseManager;
 
+/**
+ * Регистрация новой блокчейн-сети в реестре.
+ *
+ * Бизнес-выгода clean-architecture (GUIDE.md, Урок 4): чтобы добавить новую
+ * EVM-сеть (Arbitrum, Base, очередной L2-роллап), достаточно одного вызова
+ * этого Action — никакого нового PHP-кода. Адаптер семейства EVM
+ * ({@see EvmAdapter}) уже умеет с ней работать через RPC.
+ *
+ * @see \GUIDE.md  Урок 4 (#урок-4--l1-l2-и-семейства-сетей)
+ */
 final readonly class RegisterChainAction
 {
     public function __construct(

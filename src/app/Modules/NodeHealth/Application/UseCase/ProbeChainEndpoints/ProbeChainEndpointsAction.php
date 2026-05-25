@@ -12,11 +12,21 @@ use App\Modules\NodeHealth\Application\UseCase\ProbeEndpoint\ProbeEndpointAction
 use App\Modules\NodeHealth\Application\UseCase\ProbeEndpoint\ProbeEndpointData;
 
 /**
- * Прогоняет ProbeEndpointAction по всем HTTP endpoint'ам одной сети.
- * WS endpoint'ы Phase 7.1 не probe'им (мы их пока не используем для RPC fan-out).
+ * Health-check всех HTTP-эндпоинтов одной сети (GUIDE.md, Урок 12.4).
  *
- * Каждый probe — независимая операция: если один endpoint timeout'нул, другие
- * всё равно обновятся.
+ * Прогоняет {@see ProbeEndpointAction} по всем HTTP endpoint'ам сети.
+ * Для каждого вызывается probe семейства ({@see EvmEndpointHealthProbe} /
+ * {@see BitcoinEndpointHealthProbe}) — он делает простой RPC, меряет latency
+ * и возвращает {@see EndpointObservation}: healthy / degraded (>2000 ms) / unhealthy.
+ *
+ * Состояние пишется в {@see CacheEndpointHealthRegistry}; если статус изменился —
+ * событие EndpointHealthChanged. При выборе живой ноды
+ * {@see HealthBasedRpcEndpointPicker} читает оттуда → автоматический failover
+ * (паттерн circuit-breaker).
+ *
+ * Каждый probe — независимая операция: один upstream-таймаут не валит другие.
+ *
+ * @see \GUIDE.md  Урок 12 (#урок-12--надёжность-и-наблюдаемость)
  */
 final readonly class ProbeChainEndpointsAction
 {

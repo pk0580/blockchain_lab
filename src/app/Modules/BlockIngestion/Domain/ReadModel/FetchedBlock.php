@@ -12,7 +12,8 @@ use DateTimeImmutable;
 /**
  * Adapter-shaped block payload. Adapters fill this from RPC results so the
  * Application layer never sees raw RPC arrays. Outputs are flattened to
- * (toAddress, amount) per-tx — Phase 4 does not care about input shapes.
+ * (toAddress, amount) per-tx — the scanner only cares about credits to
+ * our watched addresses, not about input shapes.
  */
 final readonly class FetchedBlock
 {

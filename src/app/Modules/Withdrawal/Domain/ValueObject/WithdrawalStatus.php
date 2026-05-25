@@ -7,14 +7,21 @@ namespace App\Modules\Withdrawal\Domain\ValueObject;
 use App\Modules\Withdrawal\Domain\Exception\InvalidWithdrawalStateTransitionException;
 
 /**
- * Конечный автомат состояний withdrawal. Phase 6.2 покрывает прямую ветку:
+ * Конечный автомат withdrawal (GUIDE.md, Урок 10 «State machine»):
  *
- *   Requested → Built → Signed → Broadcasted
+ *   Requested → Built → Signed → Broadcasted → Confirming → Confirmed
+ *                                          │
+ *                                          ├─→ Stuck → Replaced (RBF, Урок 11)
+ *                                          └─→ Failed
  *
- * Любой шаг может уйти в `Failed`. Состояния `Confirming/Confirmed/Stuck/Replaced`
- * добавит Phase 6.3 (poller + RBF/resend), они уже зарезервированы в enum,
- * чтобы migration схемы был стабилен и аппаратные тесты на forbidden transitions
- * не пересоздавались.
+ * Терминальные: Confirmed, Failed, Replaced.
+ *
+ * ⚠️ Каждый переход охраняется {@see assertCanTransitionTo()}. Это инварианты,
+ * которые делают Withdrawal настоящим агрегатом, а не CRUD-моделью: пропуск
+ * шага (например, Requested → Broadcasted) — баг, а не «гибкость».
+ *
+ * @see \GUIDE.md  Урок 10 (#урок-10--вывод-средств-withdrawal)
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 enum WithdrawalStatus: string
 {

@@ -10,12 +10,22 @@ use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Слушает чужой domain event `ReorgDetection::Domain::Event::ReorgTooDeep` и
- * ставит сеть на паузу для исходящих withdrawal'ов на 24 часа (config-driven).
+ * Мост ReorgDetection::ReorgTooDeep → Withdrawal::ChainPause.
  *
- * Импорт чужого Domain допустим только здесь — это Infrastructure-листенер,
- * мост между bounded contexts (см. паттерн в Ledger::Infrastructure\Listener\ReverseLedgerOnReorg).
+ * Это «human alert»: автоматический отказ от исходящих withdrawal'ов на сеть,
+ * история которой только что переписалась глубже допустимого порога.
+ *
+ * Логика и обоснование — GUIDE.md, Урок 7 «Реакция других модулей» и
+ * Урок 11 «Пауза сети». Пока пауза активна, RequestWithdrawalAction бросит
+ * ChainPausedException (HTTP 503), пока инженер не разберётся.
+ *
+ * TTL = 24 часа по умолчанию (`withdrawal.chain_pause_ttl_seconds`).
+ *
+ * Импорт чужого Domain допустим только в Infrastructure-листенере —
  * Application-актион никогда не должен импортировать ReorgDetection.
+ *
+ * @see \GUIDE.md  Урок 7 (#урок-7--реорганизации-цепи)
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 final readonly class PauseChainOnReorgTooDeep
 {

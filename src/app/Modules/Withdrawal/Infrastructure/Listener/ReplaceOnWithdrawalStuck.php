@@ -11,11 +11,14 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Слушает собственный domain event `WithdrawalStuck` и инициирует replacement.
+ * WithdrawalStuck → ReplaceStuckWithdrawalAction (GUIDE.md, Урок 11 «Замена»).
+ *
  * Логирует, но не повторяет на сбое — повторный запуск гарантирует
- * `WatchStuckWithdrawalsJob`: оригинал так и остаётся в Stuck, при следующем
- * тике listener вызовут ещё раз (action идемпотентен через
- * `idempotency_key = "rbf:{original_id}"`).
+ * {@see WatchStuckWithdrawalsJob}: оригинал так и остаётся Stuck, при следующем
+ * тике listener дёрнут снова. Action идемпотентен через
+ * `idempotency_key = "rbf:{original_id}"` (UNIQUE в `withdrawals`).
+ *
+ * @see \GUIDE.md  Урок 11 (#урок-11--застрявшие-транзакции-и-rbf)
  */
 final readonly class ReplaceOnWithdrawalStuck
 {

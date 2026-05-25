@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Phase 7.2 — Webhook через Outbox pattern.
+ * Webhook через Outbox pattern.
  *
  *  - `outbox_messages` — буфер событий между записью aggregate'а и доставкой.
  *  - `webhook_subscriptions` — кто куда подписался.

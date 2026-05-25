@@ -19,13 +19,26 @@ use DateTimeImmutable;
 use DomainException;
 
 /**
- * Запись двойной бухгалтерии. Источник истины для баланса кошелька. Reorg
- * НИКОГДА не удаляет confirmed-запись — вместо этого создаётся встречная
- * reversal-запись, а оригинал помечается статусом Reversed (мягкая отметка,
- * исторический след не теряется).
+ * Иммутабельная запись двойной бухгалтерии — единица учёта в Ledger.
  *
- * Phase 5 пишет два типа: Deposit (Credit, при TransactionConfirmed) и
- * ReorgReversal (Debit, при ReorgDetected).
+ * Поля (GUIDE.md, Урок 8 «Сущность LedgerEntry»):
+ *   - direction      — Credit (приход) / Debit (расход)
+ *   - money          — {@see Money} (сумма строкой + валюта)
+ *   - operationType  — Deposit / ReorgReversal
+ *   - operationRef   — уникальная ссылка на источник:
+ *                       Deposit       → incomingTransactionId
+ *                       ReorgReversal → "reorg:{originalEntryId}"
+ *   - status         — Confirmed / Pending / Reversed
+ *   - reversesEntryId — ссылка на оригинал, если это компенсация.
+ *
+ * ⚠️ Главный принцип (GUIDE §8): ничего никогда не удаляем. Reorg НЕ удаляет
+ * confirmed-запись — создаётся встречная reversal, оригинал помечается
+ * Reversed. Аудит «3 мая зачислили, 4 мая сеть отменила» сохраняется навсегда.
+ *
+ * Баланс кошелька = Σ(Credit.Confirmed) − Σ(Debit.Confirmed) по всем записям
+ * с этим walletId. Это read-model.
+ *
+ * @see \GUIDE.md  Урок 8 (#урок-8--двойная-бухгалтерия-ledger)
  */
 final class LedgerEntry
 {

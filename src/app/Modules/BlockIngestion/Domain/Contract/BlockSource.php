@@ -9,8 +9,8 @@ use App\Modules\Network\Domain\ValueObject\BlockHeight;
 
 /**
  * Исходящий порт, используемый уровнем приложения для получения блоков из блокчейна.
- * Одна реализация на семейство блокчейнов живет в Инфраструктуре (Фаза 4 поставляет
- * BitcoinCoreBlockSource для семейства Bitcoin; EVM/Tron появятся в Фазе 4.5+).
+ * Одна реализация на семейство блокчейнов живет в Инфраструктуре
+ * (см. BitcoinCoreBlockSource для семейства Bitcoin).
  *
  * Реализации ДОЛЖНЫ переводить ошибки уровня адаптера в
  * {@see \App\Modules\BlockIngestion\Domain\Exception\BlockSourceException}.

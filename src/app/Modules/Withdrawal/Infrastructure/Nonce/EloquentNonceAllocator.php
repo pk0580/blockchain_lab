@@ -17,24 +17,34 @@ use Illuminate\Database\QueryException;
 use Throwable;
 
 /**
- * Сериализует выдачу nonce для каждой пары (chain, hot) через рекомендательную блокировку
- * PG advisory_xact_lock, затем выполняет `INSERT INTO nonce_assignments` с ограничением
- * уникальности по композитному первичному ключу. В SQLite (тесты) advisory-lock
- * является пустой операцией; сериализация обеспечивается глобальной транзакционной
- * блокировкой SQLite.
+ * Сериализует выдачу EVM-nonce для каждой пары (chain, hot) через PostgreSQL
+ * advisory lock и UNIQUE-constraint в таблице `nonce_assignments`.
  *
- * Алгоритм:
+ * Что такое nonce и зачем он нужен — см. GUIDE.md, Урок 3 («Аккаунт-модель»):
+ * EVM-сеть строго проверяет, что транзакция с `nonce=N` принимается только
+ * если от данного `from` уже подтверждено ровно `N` транзакций. Пропуск
+ * номера → транзакция вечно «висит» в pending.
+ *
+ * Алгоритм (GUIDE.md, Урок 3, раздел «В коде»):
  *   1. BEGIN
- *   2. SELECT MAX(nonce) WHERE chain_id=? AND hot_address=?
- *   3. Если MAX == NULL → зондирование (EVM RPC eth_getTransactionCount, fallback 0)
- *   4. next = MAX + 1 ИЛИ зондированное значение
- *   5. INSERT row(chain_id, hot_address, next, allocated_at=now)
- *   6. COMMIT (рекомендательная блокировка освобождается)
+ *   2. pg_advisory_xact_lock(crc32(chain_id + ':' + hot_address))
+ *      — сериализуем выделение для пары (сеть, горячий адрес) на уровне Postgres.
+ *   3. SELECT MAX(nonce) WHERE chain_id=? AND hot_address=?
+ *   4. Если MAX == NULL → зондируем ноду: eth_getTransactionCount(addr, "latest")
+ *      (см. {@see NonceProbeRegistry}/{@see EvmNonceProbe}).
+ *   5. next = MAX + 1, либо зондированное значение.
+ *   6. INSERT row(chain_id, hot_address, next, allocated_at=now)
+ *   7. COMMIT (advisory lock освобождается автоматически по концу tx).
  *
- * При нарушении уникальности (теоретическая гонка между нашим INSERT и внешней
- * системой, отправляющей транзакцию с таким же nonce — например, ручной перевод через
- * Metamask с того же горячего адреса) — выбрасываем NonceAllocationFailedException::collision,
- * вышестоящий механизм повторных попыток обработает это.
+ * ⚠️ Конфликт UNIQUE возникает, если кто-то параллельно (например, человек из
+ * MetaMask) отправил транзакцию с того же адреса. Кидаем
+ * {@see NonceAllocationFailedException::collision}, ретрай делает слой выше.
+ *
+ * В SQLite (тесты) advisory-lock — no-op; сериализация обеспечена глобальной
+ * write-lock SQLite.
+ *
+ * @see \GUIDE.md  Урок 3 (#урок-3--транзакция-utxo-против-аккаунта)
+ * @see \GUIDE.md  Урок 10 (#урок-10--вывод-средств-withdrawal)
  */
 final readonly class EloquentNonceAllocator implements NonceAllocator
 {
@@ -48,16 +58,22 @@ final readonly class EloquentNonceAllocator implements NonceAllocator
         $connection = $this->db->connection();
 
         return $connection->transaction(function () use ($connection, $chain, $hot): NonceValue {
+            // Шаг 2 (GUIDE §3): advisory-lock на пару (chain, hot).
+            // crc32 → uint32 → строка для биндинга; pg_advisory_xact_lock
+            // освободится автоматически при COMMIT/ROLLBACK.
             if ($connection->getDriverName() === 'pgsql') {
                 $lockKey = (string) sprintf('%u', crc32($chain->id->value.':'.$hot->value));
                 $connection->statement('SELECT pg_advisory_xact_lock(?)', [$lockKey]);
             }
 
+            // Шаг 3 (GUIDE §3): кандидат «MAX(nonce) + 1» из наших же выданных номеров.
             $maxRaw = NonceAssignmentModel::query()
                 ->where('chain_id', $chain->id->value)
                 ->where('hot_address', $hot->value)
                 ->max('nonce');
 
+            // Шаг 4 (GUIDE §3): если ни одного nonce не выдавали — спрашиваем сеть.
+            // Сеть знает истину: сколько транзакций уже подтверждено от адреса.
             if ($maxRaw === null) {
                 $probe = $this->probes->for($chain->family);
                 $probed = $probe?->probe($chain, $hot);

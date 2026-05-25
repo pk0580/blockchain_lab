@@ -13,8 +13,8 @@ use Illuminate\Http\Request;
  * аппроксимация: экспоненциальная зависимость с шумом, чтобы студент видел
  * характерную форму кривой.
  *
- * Если в Phase 9 добавим реальный сбор fee-метрик — endpoint поменяет источник
- * данных, контракт response'а остаётся стабильным.
+ * Если позже будет добавлен реальный сбор fee-метрик — endpoint поменяет
+ * источник данных, контракт response'а остаётся стабильным.
  */
 final readonly class GasChartController
 {
@@ -39,7 +39,7 @@ final readonly class GasChartController
 
         return new JsonResponse([
             'data' => [
-                'note' => 'Synthetic data — exponential decay with noise. Replace with real ETH mainnet metrics in Phase 9+.',
+                'note' => 'Synthetic data — exponential decay with noise. Replace with real ETH mainnet metrics when collected.',
                 'unit' => 'gwei / seconds',
                 'samples' => $samples,
             ],
