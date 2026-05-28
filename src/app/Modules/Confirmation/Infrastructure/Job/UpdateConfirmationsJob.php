@@ -12,9 +12,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 
 /**
- * Per-chain confirmation tick. Idempotent: re-runs are safe because the
- * action only writes when the (status, confirmations) tuple has actually
- * changed.
+ * Периодическая задача обновления подтверждений для конкретной сети.
+ * Идемпотентна: повторные запуски безопасны, так как действие выполняется
+ * только при изменении кортежа (status, confirmations).
  */
 final class UpdateConfirmationsJob implements ShouldQueue
 {

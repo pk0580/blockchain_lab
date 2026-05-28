@@ -251,7 +251,7 @@ UTXO = **Unspent Transaction Output**, «непотраченный выход �
   - `App\Modules\Network\Infrastructure\Adapter\EvmAdapter`
 - `App\Modules\Network\Domain\Entity\Chain` — агрегат **зарегистрированной сети**. Содержит `ChainId`, `ChainName`, `ChainFamily`, `NativeCurrency` (`BTC`, `ETH`, `MATIC`...), `ConfirmationRequirement` и список `RpcEndpoint`. Метод `Chain::register()` гарантирует инвариант «как минимум один RPC-эндпоинт».
 
-Добавить новую EVM-сеть = добавить запись в БД через `RegisterChainAction` (см. `App\Modules\Network\Application\UseCase\RegisterChain\RegisterChainAction`). **Никакого нового PHP-кода не нужно** — адаптер семейства EVM возьмётся автоматически. Это и есть выгода clean-architecture-разделения: бизнес-логика не знает про конкретную сеть, она работает через семейный контракт.
+Добавить новую EVM-сеть = добавить запись в БД через `RegisterChainAction` (см. `App\Modules\Network\Application\UseCase\RegisterChain\RegisterChainAction`). **Никакого нового PHP-кода не нужно** — адаптер семейства EVM возьмётся автоматически. Бизнес-логика вследствие clean-architecture-разделения не знает про конкретную сеть, она работает через семейный контракт.
 
 Добавить *новое семейство* (например, Solana) = новый класс адаптера + новые контракты в `ChainAdapterRegistry`. Это редкая, тяжёлая операция — потому что Solana работает иначе и на уровне ключей (Ed25519, не secp256k1), и на уровне модели (account, но с rent), и на уровне сериализации.
 
@@ -292,8 +292,8 @@ UTXO = **Unspent Transaction Output**, «непотраченный выход �
 
 ```
 1. Загрузить Chain и ScanCursor.
-2. Спросить currentHead у источника (BitcoinCoreBlockSource).
-3. cursor.observeHead(head).
+2. Спросить currentHead (вершину сети) у источника (BitcoinCoreBlockSource).
+3. Зафиксировать наблюдение - cursor.observeHead(head).
 4. Пока есть pending-блоки и не превысили лимит за тик:
    a. fetchBlockAt(cursor.nextHeight())
    b. ingestBlock(...) — В СОБСТВЕННОЙ ТРАНЗАКЦИИ
@@ -322,7 +322,7 @@ UTXO = **Unspent Transaction Output**, «непотраченный выход �
 
 2. **Подходящая структура данных у Redis.** Redis SET — это hash-set in-memory. Команда `SISMEMBER key value` — это `O(1)` по содержимому набора (всегда одинаково быстрая, независимо от того, сколько у нас адресов: 10 или 10 миллионов). По сети до Redis — это один RTT, типично десятки микросекунд. У PostgreSQL `SELECT 1 FROM addresses WHERE address = ?` тоже `O(log n)` по B-tree-индексу, но накладные расходы выше: парсинг SQL, планировщик, MVCC, журналирование, fsync. На «горячем пути» сканера это ощутимо.
 
-3. **Это денормализованная проекция, не источник истины.** Если Redis упадёт или потеряет данные — катастрофы не происходит: набор перестраивается из `addresses` (rebuild-команды пока нет, ручное переразвёртывание). Поэтому Redis тут можно держать без AOF-фsync и репликации — durability не нужна. PostgreSQL же платит за durability на каждый запрос. Использовать его на горячем пути — это «возить молоко на катафалке».
+3. **Это денормализованная проекция, не источник истины.** Если Redis упадёт или потеряет данные — катастрофы не происходит: набор перестраивается из `addresses` (rebuild-команды пока нет, ручное переразвёртывание). Поэтому Redis тут можно держать без AOF-фsync и репликации — durability не нужна. PostgreSQL же платит за durability на каждый запрос. Использовать его на горячем пути — это очень не рационально.
 
 4. **Шардирование по семейству.** Структура хранения — отдельный SET на семейство (`bl:addr:bitcoin`, `bl:addr:evm`, `bl:addr:tron`). Сканер BTC-блока проверяет только BTC-набор и никогда не «трогает» EVM-набор. У PostgreSQL пришлось бы либо плодить индексы с предикатом, либо платить за фильтр по `family` каждый раз.
 
@@ -390,7 +390,7 @@ Job `UpdateConfirmationsJob` (модуль `Confirmation`) периодичес�
 
 Аналогично, но проще, для нашего собственного withdrawal: `App\Modules\Withdrawal\Application\UseCase\UpdateWithdrawalConfirmations\UpdateWithdrawalConfirmationsAction`.
 
-Для EVM реализация наблюдения — `EvmWithdrawalConfirmationLookup`:
+Для EVM реализация наблюдения — `App\Modules\Withdrawal\Infrastructure\Confirmation\EvmWithdrawalConfirmationLookup`:
 
 - `eth_getTransactionByHash(hash)` → `null` ⇒ ноду «забыла» — отметить `dropped`.
 - `blockNumber === null` ⇒ ещё в mempool, pending.
@@ -410,7 +410,7 @@ State-machine продвигается строго одна-за-одной: `B
 
 ### Алгоритм обнаружения
 
-`App\Modules\ReorgDetection\Application\UseCase\EvaluateBlockReorg\EvaluateBlockReorgAction` срабатывает на каждое событие `BlockIngested` через листенер `EvaluateOnBlockIngested`.
+`App\Modules\ReorgDetection\Application\UseCase\EvaluateBlockReorg\EvaluateBlockReorgAction` срабатывает на каждое событие `BlockIngested` через листенер `App\Modules\ReorgDetection\Infrastructure\Listener\EvaluateOnBlockIngested`.
 
 Решение «есть ли reorg» принимает чистый сервис `App\Modules\ReorgDetection\Domain\Service\ChainComparator::analyze()`:
 
@@ -463,7 +463,7 @@ State-machine продвигается строго одна-за-одной: `B
 1. **Аудит**: можно по любой записи показать, откуда деньги пришли и куда ушли.
 2. **Невозможность «потерять» деньги в коде**: ошибка обнуления нарушает баланс, его легко поймать.
 
-В нашем проекте даже не двойная в полном смысле (мы пока пишем только credit-ную сторону для пользователя), но **главный принцип удержан: ничего никогда не удаляем, изменения = новые компенсирующие записи**.
+В нашем проекте не двойная в полном смысле (мы пока пишем только credit-ную сторону для пользователя), но **главный принцип удержан: ничего никогда не удаляем, изменения = новые компенсирующие записи**.
 
 ### Сущность LedgerEntry
 
@@ -476,7 +476,7 @@ State-machine продвигается строго одна-за-одной: `B
 - `status`: `Confirmed` / `Pending` / `Reversed`.
 - `reversesEntryId`: ссылка на оригинал, если это компенсация.
 
-Метод `Money` (`Ledger\Domain\ValueObject\Money`) хранит сумму как **строку** (`NUMERIC(40,0)`). Потому что в wei балансы могут быть до 40 десятичных цифр — `int64` (макс. ~19 цифр) не хватит.
+Объект `Money` (`Ledger\Domain\ValueObject\Money`) хранит сумму как **строку** (`NUMERIC(40,0)`). Потому что в wei балансы могут быть до 40 десятичных цифр — `int64` (макс. ~19 цифр) не хватит.
 
 ### Зачисление при подтверждении
 
@@ -527,7 +527,7 @@ State-machine продвигается строго одна-за-одной: `B
 3. Конвертация в sat/vbyte: `ceil(feerate * 1e8 / 1000)`, через `bcmath` — без float.
 4. Если RPC вернул `-1` (нет данных, типично на regtest) → fallback `minSatPerVbyte` из конфига.
 
-Считая итог: размер транзакции мы оцениваем эвристикой `vsize ≈ 110*inputs + 34*outputs + 10`. Итоговая комиссия = `vsize * sat_per_vbyte`. Это видно в `BitcoinTxBuilder::build()`.
+Считая итог: размер транзакции мы оцениваем эвристикой `vsize ≈ 110*inputs + 34*outputs + 10`. Итоговая комиссия = `vsize * sat_per_vbyte`. Это видно в `App\Modules\Withdrawal\Infrastructure\TxBuilder\BitcoinTxBuilder::build()`.
 
 ### EVM: EIP-1559
 

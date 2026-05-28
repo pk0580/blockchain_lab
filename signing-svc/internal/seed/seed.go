@@ -25,9 +25,9 @@ import (
 // Reference — это то, что хранят вызывающие стороны; Master никогда не возвращается за
 // границы процесса.
 type Seed struct {
-	Reference string
-	Mnemonic  string
-	Master    *bip32.Key
+	Reference string // Публичное имя (ссылка) для Laravel
+	Mnemonic  string // Сама секретная фраза из 24 слов
+	Master    *bip32.Key // Мастер-ключ, выведенный из фразы
 }
 
 // Generate создаёт новую BIP-39 мнемонику с 256-битной энтропией (24 слова)

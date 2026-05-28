@@ -85,23 +85,45 @@ final readonly class EvaluateBlockReorgAction
         /** @var BlockHeight $orphanedHeight */
         $orphanedHeight = $analysis->orphanedHeight;
 
-        // GUIDE §7 «Что делает Action при обнаружении reorg» — все три
-        // компенсирующие операции строго в одной транзакции, иначе можно
-        // оставить курсор без блока или блок без события.
+        $orphanedCount = $this->compensateReorg($chainId, $orphanedHeight);
+
+        $this->dispatchEvents(
+            chainId: $chainId,
+            orphanedHeight: $orphanedHeight,
+            orphanedCount: $orphanedCount,
+            threshold: $chain->confirmationRequirement->maxReorgDepth,
+        );
+
+        return new EvaluateBlockReorgResult(
+            chainId: $chainId->value,
+            newHeight: $data->height,
+            kind: ReorgKind::Reorg,
+            orphanedHeight: $orphanedHeight->value,
+            orphanedTransactionCount: $orphanedCount,
+        );
+    }
+
+    private function compensateReorg(ChainId $chainId, BlockHeight $orphanedHeight): int
+    {
         $orphanedCount = 0;
+
         $this->db->transaction(function () use ($chainId, $orphanedHeight, &$orphanedCount): void {
-            // Шаг 1: не удаляем IncomingTransaction — помечаем Orphaned.
-            // Аудит сохраняется (см. также Ledger::reverse, Урок 8).
             $orphanedCount = $this->writer->orphanIncomingAtHeight($chainId, $orphanedHeight);
-            // Шаг 2: удаляем запись блока, чтобы её место занял новый блок при ре-скане.
             $this->writer->deleteBlockAtHeight($chainId, $orphanedHeight);
-            // Шаг 3: курсор откатываем ровно на один блок назад. Walk-back
-            // глубже одного шага делается итеративно через цикл сканера.
+
             $rollbackTarget = new BlockHeight(max(0, $orphanedHeight->value - 1));
             $this->writer->rollbackScanCursorTo($chainId, $rollbackTarget);
         });
 
-        $threshold = $chain->confirmationRequirement->maxReorgDepth;
+        return $orphanedCount;
+    }
+
+    private function dispatchEvents(
+        ChainId $chainId,
+        BlockHeight $orphanedHeight,
+        int $orphanedCount,
+        int $threshold,
+    ): void {
         $now = new DateTimeImmutable();
         $depth = new ReorgDepth(1);
 
@@ -131,13 +153,5 @@ final readonly class EvaluateBlockReorgAction
                 ));
             }
         });
-
-        return new EvaluateBlockReorgResult(
-            chainId: $chainId->value,
-            newHeight: $data->height,
-            kind: ReorgKind::Reorg,
-            orphanedHeight: $orphanedHeight->value,
-            orphanedTransactionCount: $orphanedCount,
-        );
     }
 }

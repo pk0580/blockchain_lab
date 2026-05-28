@@ -51,16 +51,16 @@ use Throwable;
  */
 final readonly class BitcoinTxBuilder implements TxBuilder
 {
-    private const ESTIMATED_INPUT_VBYTES = 110;
-    private const ESTIMATED_OUTPUT_VBYTES = 34;
-    private const ESTIMATED_OVERHEAD_VBYTES = 10;
-    private const SATOSHIS_PER_BTC = 100_000_000;
+    private const int ESTIMATED_INPUT_VBYTES = 110;
+    private const int ESTIMATED_OUTPUT_VBYTES = 34;
+    private const int ESTIMATED_OVERHEAD_VBYTES = 10;
+    private const int SATOSHIS_PER_BTC = 100_000_000;
 
     /**
      * BIP-125 «opt-in replace-by-fee»: sequence < 0xfffffffe = «replaceable».
      * См. GUIDE.md, Урок 11 — раздел «BIP-125 в Bitcoin: подробнее».
      */
-    private const RBF_SEQUENCE = 0xfffffffd;
+    private const int RBF_SEQUENCE = 0xfffffffd;
 
     public function __construct(
         /** @var Closure(Chain): BitcoinRpcClient */
@@ -75,121 +75,33 @@ final readonly class BitcoinTxBuilder implements TxBuilder
         FeeQuoteSnapshot $fee,
         ?NonceValue $nonce,
     ): BuiltTransaction {
-        if ($chain->family !== ChainFamily::Bitcoin) {
-            throw new RuntimeException(
-                "BitcoinTxBuilder не может строить транзакции для семейства '{$chain->family->value}'."
-            );
-        }
-        $satPerVbyte = (int) ($fee->breakdown['sat_per_vbyte'] ?? 0);
-        if ($satPerVbyte < 1) {
-            throw new RuntimeException(
-                "BitcoinTxBuilder требует sat_per_vbyte >= 1 в снимке комиссии."
-            );
-        }
+        $this->ensureBitcoinChain($chain);
+        $satPerVbyte = $this->getSatPerVbyte($fee);
 
         $rpc = ($this->rpcFactory)($chain);
-
-        // Шаг 1 (GUIDE §3): запрашиваем все UTXO горячего адреса с минимум 1 confirmation.
-        // 9999 — верхняя граница confirmations (Bitcoin Core API не имеет «inf»).
-        try {
-            /** @var list<array<string, mixed>> $utxos */
-            $utxos = (array) $rpc->call('listunspent', [1, 9999, [$from->value]]);
-        } catch (BlockSourceException $e) {
-            throw new RuntimeException("Ошибка listunspent: {$e->getMessage()}", 0, $e);
-        } catch (Throwable $e) {
-            throw new RuntimeException("Ошибка listunspent: {$e->getMessage()}", 0, $e);
-        }
-
-        // Шаг 2 (GUIDE §3): Greedy largest-first — крупные UTXO в начало.
-        // Минимизирует число входов → меньше vsize → меньше комиссия.
-        usort($utxos, function (array $a, array $b): int {
-            $av = (float) ($a['amount'] ?? 0);
-            $bv = (float) ($b['amount'] ?? 0);
-            return $bv <=> $av;
-        });
+        $utxos = $this->fetchSortedUtxos($rpc, $from);
 
         $amountSat = (int) $amount->value;
-        $sumSat = 0;
-        $inputs = [];
-        $outputCount = 2; // получатель + сдача; уточним при отсутствии сдачи
+        $selection = $this->selectUtxos($utxos, $amountSat, $satPerVbyte);
 
-        foreach ($utxos as $utxo) {
-            $btc = (float) ($utxo['amount'] ?? 0);
-            $utxoSat = (int) round($btc * self::SATOSHIS_PER_BTC);
-            $inputs[] = [
-                'txid' => (string) ($utxo['txid'] ?? ''),
-                'vout' => (int) ($utxo['vout'] ?? 0),
-                'scriptPubKey' => (string) ($utxo['scriptPubKey'] ?? ''),
-                'amount_sat' => $utxoSat,
-            ];
-            $sumSat += $utxoSat;
+        $outputs = $this->prepareOutputs(
+            $from->value,
+            $to->value,
+            $amountSat,
+            $selection['sumSat'],
+            $selection['feeSat']
+        );
 
-            $estimatedVsize = self::ESTIMATED_OVERHEAD_VBYTES
-                + count($inputs) * self::ESTIMATED_INPUT_VBYTES
-                + $outputCount * self::ESTIMATED_OUTPUT_VBYTES;
-            $feeSat = $estimatedVsize * $satPerVbyte;
-
-            if ($sumSat >= $amountSat + $feeSat) {
-                break;
-            }
-        }
-
-        if ($inputs === []) {
-            throw new RuntimeException(
-                "Нет доступных UTXO для горячего адреса '{$from->value}' в сети '{$chain->id->value}'."
-            );
-        }
-
-        $estimatedVsize = self::ESTIMATED_OVERHEAD_VBYTES
-            + count($inputs) * self::ESTIMATED_INPUT_VBYTES
-            + $outputCount * self::ESTIMATED_OUTPUT_VBYTES;
-        $feeSat = $estimatedVsize * $satPerVbyte;
-
-        if ($sumSat < $amountSat + $feeSat) {
-            throw new RuntimeException(
-                "Недостаточно средств для вывода в '{$chain->id->value}': "
-                ."есть {$sumSat} sat, требуется ".($amountSat + $feeSat)." sat."
-            );
-        }
-
-        // Шаг 3 (GUIDE §3): считаем сдачу.
-        $changeSat = $sumSat - $amountSat - $feeSat;
-        // ⚠️ Dust threshold = 546 сатоши (GUIDE §3, врезка про единицы):
-        // ниже этого порога создавать UTXO бессмысленно — будущая комиссия
-        // за её трату превысит саму сумму. Поэтому отдаём «пыль» майнерам.
-        if ($changeSat > 0 && $changeSat < 546) {
-            $changeSat = 0;
-            $outputCount = 1;
-        }
-
-        $outputs = [
-            $to->value => $this->satToBtcString($amountSat),
-        ];
-        if ($changeSat > 0) {
-            $outputs[$from->value] = $this->satToBtcString($changeSat);
-        }
-
-        try {
-            $rawHex = $rpc->call('createrawtransaction', [
-                array_map(static fn (array $i): array => ['txid' => $i['txid'], 'vout' => $i['vout']], $inputs),
-                $outputs,
-            ]);
-        } catch (Throwable $e) {
-            throw new RuntimeException("Ошибка createrawtransaction: {$e->getMessage()}", 0, $e);
-        }
-
-        if (! is_string($rawHex) || $rawHex === '') {
-            throw new RuntimeException('createrawtransaction вернул пустой результат.');
-        }
+        $rawHex = $this->createRawTx($rpc, $selection['inputs'], $outputs);
 
         return new BuiltTransaction(
             rawHex: $rawHex,
-            signingExtras: ['inputs' => $inputs],
+            signingExtras: ['inputs' => $selection['inputs']],
         );
     }
 
     /**
-     * BIP-125 RBF — пересборка транзакции с повышенной комиссией.
+     * BIP-125 RBF — пересборка транзакции с повышенной комиссией (Replace-By-Fee).
      *
      * Условия Bitcoin для замены (GUIDE.md, Урок 11 — «BIP-125 в Bitcoin: подробнее»):
      *  - Все входы новой транзакции имеют sequence < 0xfffffffe (opt-in RBF).
@@ -208,17 +120,8 @@ final readonly class BitcoinTxBuilder implements TxBuilder
         ?NonceValue $previousNonce,
         ?array $previousExtras,
     ): BuiltTransaction {
-        if ($chain->family !== ChainFamily::Bitcoin) {
-            throw new RuntimeException(
-                "BitcoinTxBuilder не может пересобирать транзакции для семейства '{$chain->family->value}'."
-            );
-        }
-        $satPerVbyte = (int) ($fee->breakdown['sat_per_vbyte'] ?? 0);
-        if ($satPerVbyte < 1) {
-            throw new RuntimeException(
-                'BitcoinTxBuilder требует sat_per_vbyte >= 1 в снимке комиссии для замены.'
-            );
-        }
+        $this->ensureBitcoinChain($chain, true);
+        $satPerVbyte = $this->getSatPerVbyte($fee);
 
         /** @var list<array<string, mixed>>|null $previousInputs */
         $previousInputs = $previousExtras['inputs'] ?? null;
@@ -242,70 +145,187 @@ final readonly class BitcoinTxBuilder implements TxBuilder
             $sumSat += $utxoSat;
         }
 
-        $outputCount = 2;
-        $estimatedVsize = self::ESTIMATED_OVERHEAD_VBYTES
-            + count($inputs) * self::ESTIMATED_INPUT_VBYTES
-            + $outputCount * self::ESTIMATED_OUTPUT_VBYTES;
+        $estimatedVsize = $this->calculateVsize(count($inputs), 2);
         $feeSat = $estimatedVsize * $satPerVbyte;
 
         if ($sumSat < $amountSat + $feeSat) {
-            throw new RuntimeException(
-                "Замена BIP-125 недостаточна для '{$chain->id->value}': "
-                ."входы {$sumSat} sat не могут покрыть сумму {$amountSat} + комиссию {$feeSat}."
-            );
-        }
-
-        $changeSat = $sumSat - $amountSat - $feeSat;
-        if ($changeSat > 0 && $changeSat < 546) {
-            $changeSat = 0;
-            $outputCount = 1;
-            $estimatedVsize = self::ESTIMATED_OVERHEAD_VBYTES
-                + count($inputs) * self::ESTIMATED_INPUT_VBYTES
-                + $outputCount * self::ESTIMATED_OUTPUT_VBYTES;
-            $feeSat = $estimatedVsize * $satPerVbyte;
-            // Пересчитываем необходимость сдачи после изменения vsize.
-            $changeSat = $sumSat - $amountSat - $feeSat;
-            if ($changeSat < 0) {
+            // Если с 2 выходами не хватает, пробуем без сдачи (1 выход)
+            $estimatedVsizeOneOutput = $this->calculateVsize(count($inputs), 1);
+            $feeSatOneOutput = $estimatedVsizeOneOutput * $satPerVbyte;
+            if ($sumSat < $amountSat + $feeSatOneOutput) {
                 throw new RuntimeException(
-                    "Замена BIP-125 стала недостаточной после отбрасывания пылевой сдачи в '{$chain->id->value}'."
+                    "Замена BIP-125 недостаточна для '{$chain->id->value}': "
+                    ."входы {$sumSat} sat не могут покрыть сумму {$amountSat} + комиссию {$feeSatOneOutput}."
                 );
             }
-            if ($changeSat > 0 && $changeSat < 546) {
-                $changeSat = 0;
-            } elseif ($changeSat > 0) {
-                $outputCount = 2;
-            }
         }
 
-        $outputs = [
-            $to->value => $this->satToBtcString($amountSat),
-        ];
-        if ($changeSat > 0) {
-            $outputs[$from->value] = $this->satToBtcString($changeSat);
-        }
+        $outputs = $this->prepareOutputs(
+            $from->value,
+            $to->value,
+            $amountSat,
+            $sumSat,
+            $feeSat
+        );
 
         $rpc = ($this->rpcFactory)($chain);
-        try {
-            $rawHex = $rpc->call('createrawtransaction', [
-                array_map(static fn (array $i): array => [
-                    'txid' => $i['txid'],
-                    'vout' => $i['vout'],
-                    'sequence' => self::RBF_SEQUENCE,
-                ], $inputs),
-                $outputs,
-            ]);
-        } catch (Throwable $e) {
-            throw new RuntimeException("Ошибка RBF createrawtransaction: {$e->getMessage()}", 0, $e);
-        }
-
-        if (! is_string($rawHex) || $rawHex === '') {
-            throw new RuntimeException('RBF createrawtransaction вернул пустой результат.');
-        }
+        $rawHex = $this->createRawTx($rpc, $inputs, $outputs, true);
 
         return new BuiltTransaction(
             rawHex: $rawHex,
             signingExtras: ['inputs' => $inputs, 'replacement' => true],
         );
+    }
+
+    private function ensureBitcoinChain(Chain $chain, bool $isRebuild = false): void
+    {
+        if ($chain->family !== ChainFamily::Bitcoin) {
+            $action = $isRebuild ? 'пересобирать' : 'строить';
+            throw new RuntimeException(
+                "BitcoinTxBuilder не может {$action} транзакции для семейства '{$chain->family->value}'."
+            );
+        }
+    }
+
+    private function getSatPerVbyte(FeeQuoteSnapshot $fee): int
+    {
+        $satPerVbyte = (int) ($fee->breakdown['sat_per_vbyte'] ?? 0);
+        if ($satPerVbyte < 1) {
+            throw new RuntimeException(
+                'BitcoinTxBuilder требует sat_per_vbyte >= 1 в снимке комиссии.'
+            );
+        }
+
+        return $satPerVbyte;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function fetchSortedUtxos(BitcoinRpcClient $rpc, HotAddress $from): array
+    {
+        try {
+            /** @var list<array<string, mixed>> $utxos */
+            $utxos = (array) $rpc->call('listunspent', [1, 9999, [$from->value]]);
+        } catch (Throwable $e) {
+            throw new RuntimeException("Ошибка listunspent: {$e->getMessage()}", 0, $e);
+        }
+
+        usort($utxos, function (array $a, array $b): int {
+            $av = (float) ($a['amount'] ?? 0);
+            $bv = (float) ($b['amount'] ?? 0);
+            return $bv <=> $av;
+        });
+
+        return $utxos;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $utxos
+     * @return array{inputs: list<array<string, mixed>>, sumSat: int, feeSat: int}
+     */
+    private function selectUtxos(array $utxos, int $amountSat, int $satPerVbyte): array
+    {
+        $sumSat = 0;
+        $inputs = [];
+        $outputCount = 2;
+
+        foreach ($utxos as $utxo) {
+            $btc = (float) ($utxo['amount'] ?? 0);
+            $utxoSat = (int) round($btc * self::SATOSHIS_PER_BTC);
+            $inputs[] = [
+                'txid' => (string) ($utxo['txid'] ?? ''),
+                'vout' => (int) ($utxo['vout'] ?? 0),
+                'scriptPubKey' => (string) ($utxo['scriptPubKey'] ?? ''),
+                'amount_sat' => $utxoSat,
+            ];
+            $sumSat += $utxoSat;
+
+            $feeSat = $this->calculateVsize(count($inputs), $outputCount) * $satPerVbyte;
+
+            if ($sumSat >= $amountSat + $feeSat) {
+                break;
+            }
+        }
+
+        if ($inputs === []) {
+            throw new RuntimeException('Нет доступных UTXO для горячего адреса.');
+        }
+
+        $feeSat = $this->calculateVsize(count($inputs), $outputCount) * $satPerVbyte;
+
+        if ($sumSat < $amountSat + $feeSat) {
+            throw new RuntimeException(
+                "Недостаточно средств: есть {$sumSat} sat, требуется " . ($amountSat + $feeSat) . " sat."
+            );
+        }
+
+        return [
+            'inputs' => $inputs,
+            'sumSat' => $sumSat,
+            'feeSat' => $feeSat,
+        ];
+    }
+
+    private function calculateVsize(int $inputCount, int $outputCount): int
+    {
+        return self::ESTIMATED_OVERHEAD_VBYTES
+            + $inputCount * self::ESTIMATED_INPUT_VBYTES
+            + $outputCount * self::ESTIMATED_OUTPUT_VBYTES;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function prepareOutputs(
+        string $fromAddress,
+        string $toAddress,
+        int $amountSat,
+        int $sumSat,
+        int $feeSat
+    ): array {
+        $changeSat = $sumSat - $amountSat - $feeSat;
+
+        // Dust threshold = 546 сатоши
+        if ($changeSat > 0 && $changeSat < 546) {
+            $changeSat = 0;
+        }
+
+        $outputs = [
+            $toAddress => $this->satToBtcString($amountSat),
+        ];
+
+        if ($changeSat > 0) {
+            $outputs[$fromAddress] = $this->satToBtcString($changeSat);
+        }
+
+        return $outputs;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $inputs
+     * @param array<string, string> $outputs
+     */
+    private function createRawTx(BitcoinRpcClient $rpc, array $inputs, array $outputs, bool $isRbf = false): string
+    {
+        $rpcInputs = array_map(static fn (array $i): array => [
+            'txid' => $i['txid'],
+            'vout' => $i['vout'],
+            'sequence' => $isRbf ? self::RBF_SEQUENCE : 0xffffffff,
+        ], $inputs);
+
+        try {
+            $rawHex = $rpc->call('createrawtransaction', [$rpcInputs, $outputs]);
+        } catch (Throwable $e) {
+            $prefix = $isRbf ? 'RBF ' : '';
+            throw new RuntimeException("Ошибка {$prefix}createrawtransaction: {$e->getMessage()}", 0, $e);
+        }
+
+        if (! is_string($rawHex) || $rawHex === '') {
+            throw new RuntimeException('createrawtransaction вернул пустой результат.');
+        }
+
+        return $rawHex;
     }
 
     private function satToBtcString(int $sat): string

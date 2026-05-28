@@ -11,6 +11,7 @@ use App\Modules\Withdrawal\Domain\Contract\WithdrawalConfirmationLookupRegistry;
 use App\Modules\Withdrawal\Domain\Entity\Withdrawal;
 use App\Modules\Withdrawal\Domain\Exception\WithdrawalNotFoundException;
 use App\Modules\Withdrawal\Domain\Repository\WithdrawalRepository;
+use App\Modules\Withdrawal\Domain\ValueObject\ConfirmationObservation;
 use App\Modules\Withdrawal\Domain\ValueObject\WithdrawalId;
 use App\Modules\Withdrawal\Domain\ValueObject\WithdrawalStatus;
 use DateTimeImmutable;
@@ -50,78 +51,35 @@ final readonly class UpdateWithdrawalConfirmationsAction
 
     public function handle(UpdateWithdrawalConfirmationsData $data): UpdateWithdrawalConfirmationsResult
     {
-        $withdrawalId = new WithdrawalId($data->withdrawalId);
-        $withdrawal = $this->repo->findById($withdrawalId)
-            ?? throw WithdrawalNotFoundException::byId($withdrawalId);
+        $withdrawal = $this->getWithdrawal($data->withdrawalId);
 
         if (! $this->isPollable($withdrawal->status())) {
-            return new UpdateWithdrawalConfirmationsResult(
-                status: $withdrawal->status(),
-                confirmations: $withdrawal->confirmations(),
-                changed: false,
-                dropped: false,
-            );
+            return UpdateWithdrawalConfirmationsResult::noChange($withdrawal);
         }
 
-        $txHash = $withdrawal->txHash()
-            ?? throw new RuntimeException(
-                "Withdrawal '{$withdrawal->id->value}' is in status {$withdrawal->status()->value} but has no tx_hash."
-            );
+        $txHash = $withdrawal->txHash() ?? throw new RuntimeException(
+            "Withdrawal '{$withdrawal->id->value}' is in status {$withdrawal->status()->value} but has no tx_hash."
+        );
 
         $chain = $this->chains->findById($withdrawal->chainId)
             ?? throw ChainNotFoundException::byId($withdrawal->chainId);
 
-        $observation = $this->lookups
-            ->for($chain->family)
-            ->observe($chain, $txHash);
+        $observation = $this->lookups->for($chain->family)->observe($chain, $txHash);
 
         if ($observation->dropped) {
-            return new UpdateWithdrawalConfirmationsResult(
-                status: $withdrawal->status(),
-                confirmations: $withdrawal->confirmations(),
-                changed: false,
-                dropped: true,
-            );
+            return UpdateWithdrawalConfirmationsResult::dropped($withdrawal);
         }
 
         if ($observation->isPending()) {
-            return new UpdateWithdrawalConfirmationsResult(
-                status: $withdrawal->status(),
-                confirmations: $withdrawal->confirmations(),
-                changed: false,
-                dropped: false,
-            );
+            return UpdateWithdrawalConfirmationsResult::noChange($withdrawal);
         }
 
-        $now = new DateTimeImmutable();
-        $required = $chain->confirmationRequirement->requiredConfirmations;
-        $previous = $withdrawal->status();
+        $previousStatus = $withdrawal->status();
         $previousConfirmations = $withdrawal->confirmations();
 
-        $events = [];
-        $this->db->transaction(function () use (
-            $withdrawal,
-            $observation,
-            $required,
-            $now,
-            &$events,
-        ): void {
-            if ($observation->confirmations >= $required) {
-                if ($withdrawal->status() !== WithdrawalStatus::Confirmed) {
-                    $withdrawal->markAsConfirmed($observation->confirmations, $now);
-                }
-            } else {
-                $withdrawal->markAsConfirming($observation->confirmations, $now);
-            }
-            $this->repo->save($withdrawal);
-            $events = $withdrawal->pullPendingEvents();
-        });
+        $this->applyObservation($withdrawal, $observation, $chain->confirmationRequirement->requiredConfirmations);
 
-        foreach ($events as $event) {
-            $this->events->dispatch($event);
-        }
-
-        $changed = $withdrawal->status() !== $previous
+        $changed = $withdrawal->status() !== $previousStatus
             || $withdrawal->confirmations() !== $previousConfirmations;
 
         return new UpdateWithdrawalConfirmationsResult(
@@ -130,6 +88,38 @@ final readonly class UpdateWithdrawalConfirmationsAction
             changed: $changed,
             dropped: false,
         );
+    }
+
+    private function getWithdrawal(string $id): Withdrawal
+    {
+        $withdrawalId = new WithdrawalId($id);
+
+        return $this->repo->findById($withdrawalId)
+            ?? throw WithdrawalNotFoundException::byId($withdrawalId);
+    }
+
+    private function applyObservation(
+        Withdrawal $withdrawal,
+        ConfirmationObservation $observation,
+        int $requiredConfirmations
+    ): void {
+        $now = new DateTimeImmutable();
+
+        $this->db->transaction(function () use ($withdrawal, $observation, $requiredConfirmations, $now): void {
+            if ($observation->confirmations >= $requiredConfirmations) {
+                if ($withdrawal->status() !== WithdrawalStatus::Confirmed) {
+                    $withdrawal->markAsConfirmed($observation->confirmations, $now);
+                }
+            } else {
+                $withdrawal->markAsConfirming($observation->confirmations, $now);
+            }
+
+            $this->repo->save($withdrawal);
+
+            foreach ($withdrawal->pullPendingEvents() as $event) {
+                $this->events->dispatch($event);
+            }
+        });
     }
 
     private function isPollable(WithdrawalStatus $status): bool
