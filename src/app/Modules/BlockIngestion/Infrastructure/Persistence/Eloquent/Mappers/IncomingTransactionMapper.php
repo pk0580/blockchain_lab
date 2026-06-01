@@ -71,16 +71,18 @@ final class IncomingTransactionMapper
      */
     private function amountToString(string|int|float $raw): string
     {
-        if (is_int($raw)) {
-            return (string) $raw;
-        }
         if (is_float($raw)) {
-            return number_format($raw, 0, '.', '');
+            // Принудительно отсекаем дробную часть (truncation) и подавляем экспоненту
+            return number_format($raw >= 0 ? floor($raw) : ceil($raw), 0, '.', '');
         }
-        if (str_contains($raw, '.')) {
-            $integer = explode('.', $raw, 2)[0];
+
+        $string = (string) $raw;
+
+        if (str_contains($string, '.')) {
+            $integer = explode('.', $string, 2)[0];
             return $integer === '' ? '0' : $integer;
         }
-        return $raw;
+
+        return $string;
     }
 }

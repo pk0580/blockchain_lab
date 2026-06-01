@@ -38,22 +38,10 @@ final readonly class EloquentConfirmedTransactionView implements ConfirmedTransa
             txHash: new TxHash($row->tx_hash),
             blockHeight: (int) $row->block_height,
             toAddress: $row->to_address,
-            money: new Money($this->amountToString($row->amount), $row->currency),
+            // NUMERIC(40,0): amount всегда целочисленный (minor units).
+            // Money сам отвергнет дробное/мусорное значение — порча данных
+            // всплывёт громко, а не молча округлится/обрежется.
+            money: new Money((string) $row->amount, $row->currency),
         );
-    }
-
-    private function amountToString(string|int|float $raw): string
-    {
-        if (is_int($raw)) {
-            return (string) $raw;
-        }
-        if (is_float($raw)) {
-            return number_format($raw, 0, '.', '');
-        }
-        if (str_contains($raw, '.')) {
-            $integer = explode('.', $raw, 2)[0];
-            return $integer === '' ? '0' : $integer;
-        }
-        return $raw;
     }
 }

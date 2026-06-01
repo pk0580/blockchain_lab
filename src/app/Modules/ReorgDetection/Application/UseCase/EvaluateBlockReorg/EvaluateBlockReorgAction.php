@@ -105,17 +105,17 @@ final readonly class EvaluateBlockReorgAction
 
     private function compensateReorg(ChainId $chainId, BlockHeight $orphanedHeight): int
     {
-        $orphanedCount = 0;
+        return $this->db->transaction(function () use ($chainId, $orphanedHeight): int {
+            $count = $this->writer->orphanIncomingAtHeight($chainId, $orphanedHeight);
 
-        $this->db->transaction(function () use ($chainId, $orphanedHeight, &$orphanedCount): void {
-            $orphanedCount = $this->writer->orphanIncomingAtHeight($chainId, $orphanedHeight);
             $this->writer->deleteBlockAtHeight($chainId, $orphanedHeight);
+            $this->writer->rollbackScanCursorTo(
+                $chainId,
+                new BlockHeight(max(0, $orphanedHeight->value - 1))
+            );
 
-            $rollbackTarget = new BlockHeight(max(0, $orphanedHeight->value - 1));
-            $this->writer->rollbackScanCursorTo($chainId, $rollbackTarget);
+            return $count;
         });
-
-        return $orphanedCount;
     }
 
     private function dispatchEvents(
